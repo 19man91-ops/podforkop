@@ -4,7 +4,7 @@ set -e
 echo "Updating PodForCOP UI and backend scripts..."
 
 TS=$(date +%s)
-BASE_URL="https://raw.githubusercontent.com/19man91-ops/podforkop/main"
+BASE_URL="https://raw.githubusercontent.com/19man91-ops/podforkop/0c9891ef5127d770f41e5257fa67dc917126e4fb"
 FETCH_CMD="wget -q --no-check-certificate -O"
 if ! command -v wget >/dev/null 2>&1; then
     FETCH_CMD="uclient-fetch -q --no-check-certificate -O"

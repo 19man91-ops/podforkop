@@ -42,6 +42,9 @@ export default defineConfig({
             }
         );
 
+        // LuCI executes modules inside a function. Parse the final transformed
+        // bundle here so ESM aliases cannot ship as invalid object properties.
+        new Function(code);
         fs.writeFileSync(file, code, 'utf8');
         console.log(`✅ Patched LuCI build: ${file}`);
     },

@@ -35,6 +35,7 @@ jobs:
         with:
           node-version: '22'
       - run: npm install
+      - run: npm run lint -- --max-warnings=0
       - run: npm test -- --run
       - run: npm run build
 
