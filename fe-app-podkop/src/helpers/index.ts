@@ -11,7 +11,6 @@ export * from './preserveScrollForPage';
 export * from './parseQueryString';
 export * from './svgEl';
 export * from './insertIf';
-export * from './element';
 export * from './domainToUnicode';
 export * from './isDocumentVisible';
 export * from './pollDelay';

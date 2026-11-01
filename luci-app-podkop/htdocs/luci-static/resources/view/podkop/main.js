@@ -4940,45 +4940,70 @@ var DiagnosticTab = {
 };
 
 // src/helpers/element.ts
+function getLuciE() {
+  if (typeof window !== "undefined" && typeof window.E === "function") {
+    return window.E;
+  }
+  if (typeof globalThis !== "undefined" && typeof globalThis.E === "function") {
+    return globalThis.E;
+  }
+  return (tag, attrs, children) => {
+    const el = document.createElement(String(tag));
+    if (attrs && typeof attrs === "object") {
+      Object.entries(attrs).forEach(([k, v]) => {
+        if (k === "class" && typeof v === "string") el.className = v;
+        else if (typeof v === "string") el.setAttribute(k, v);
+      });
+    }
+    if (Array.isArray(children)) {
+      children.forEach((c) => {
+        if (typeof c === "string") el.appendChild(document.createTextNode(c));
+        else if (c instanceof Node) el.appendChild(c);
+      });
+    } else if (typeof children === "string") {
+      el.appendChild(document.createTextNode(children));
+    }
+    return el;
+  };
+}
 function element(...args) {
   if (args.length >= 3 && (typeof args[2] === "string" || typeof args[2] === "number")) {
     args[2] = [String(args[2])];
   }
-  return E2(...args);
+  return getLuciE()(...args);
 }
-var E2 = element;
 
 // src/podkop/tabs/monitoring/render.ts
 function render3() {
-  return E2(
+  return element(
     "div",
     {
       id: "monitoring-status",
       class: "fkp_monitoring-page"
     },
     [
-      E2("div", { class: "fkp_monitoring-page__panel" }, [
-        E2("div", { class: "fkp_monitoring-page__controls" }, [
-          E2("div", { class: "fkp_monitoring-page__filters" }, [
-            E2(
+      element("div", { class: "fkp_monitoring-page__panel" }, [
+        element("div", { class: "fkp_monitoring-page__controls" }, [
+          element("div", { class: "fkp_monitoring-page__filters" }, [
+            element(
               "select",
               {
                 id: "monitoring-device-filter",
                 class: "cbi-input-select"
               },
-              [E2("option", { value: "" }, _("All devices"))]
+              [element("option", { value: "" }, _("All devices"))]
             ),
-            E2(
+            element(
               "select",
               {
                 id: "monitoring-route-filter",
                 class: "cbi-input-select"
               },
-              [E2("option", { value: "" }, _("All routes"))]
+              [element("option", { value: "" }, _("All routes"))]
             ),
-            E2("label", { class: "fkp_monitoring-page__search" }, [
-              E2("span", { class: "fkp_monitoring-page__search-icon" }, []),
-              E2("input", {
+            element("label", { class: "fkp_monitoring-page__search" }, [
+              element("span", { class: "fkp_monitoring-page__search-icon" }, []),
+              element("input", {
                 id: "monitoring-search",
                 class: "cbi-input-text fkp_monitoring-page__search-input",
                 type: "search",
@@ -4987,17 +5012,17 @@ function render3() {
               })
             ])
           ]),
-          E2("div", { class: "fkp_monitoring-page__actions" }, [
-            E2("label", { class: "fkp_monitoring-page__checkbox" }, [
-              E2("input", {
+          element("div", { class: "fkp_monitoring-page__actions" }, [
+            element("label", { class: "fkp_monitoring-page__checkbox" }, [
+              element("input", {
                 id: "monitoring-auto-refresh",
                 class: "cbi-input-checkbox",
                 type: "checkbox",
                 checked: true
               }),
-              E2("span", {}, _("Auto refresh"))
+              element("span", {}, _("Auto refresh"))
             ]),
-            E2(
+            element(
               "button",
               {
                 id: "monitoring-close-all",
@@ -5010,14 +5035,14 @@ function render3() {
             )
           ])
         ]),
-        E2("ul", { class: "cbi-tabmenu fkp_monitoring-page__tabs" }, [
-          E2("li", { id: "monitoring-tab-active", class: "cbi-tab" }, [
-            E2("a", { href: "#" }, _("Active"))
+        element("ul", { class: "cbi-tabmenu fkp_monitoring-page__tabs" }, [
+          element("li", { id: "monitoring-tab-active", class: "cbi-tab" }, [
+            element("a", { href: "#" }, _("Active"))
           ]),
-          E2("li", { id: "monitoring-tab-closed", class: "cbi-tab-disabled" }, [
-            E2("a", { href: "#" }, _("Closed"))
+          element("li", { id: "monitoring-tab-closed", class: "cbi-tab-disabled" }, [
+            element("a", { href: "#" }, _("Closed"))
           ]),
-          E2(
+          element(
             "span",
             {
               id: "monitoring-pause-note",
@@ -5029,11 +5054,11 @@ function render3() {
             _("Paused while text is selected")
           )
         ]),
-        E2(
+        element(
           "div",
           { id: "monitoring-connections", class: "fkp_monitoring-page__body" },
           [
-            E2(
+            element(
               "div",
               {
                 class: "fkp_monitoring-page__state fkp_monitoring-page__state--loading"
@@ -5383,7 +5408,7 @@ function compareSources(a, b) {
 
 // src/podkop/tabs/monitoring/connectionList.ts
 function renderList(rows, { closable, sort }) {
-  return E2(
+  return element(
     "div",
     {
       class: [
@@ -5393,7 +5418,7 @@ function renderList(rows, { closable, sort }) {
       role: "table"
     },
     [
-      E2(
+      element(
         "div",
         {
           class: "fkp_monitoring-page__row fkp_monitoring-page__row--head",
@@ -5408,7 +5433,7 @@ function renderList(rows, { closable, sort }) {
           renderSortHeading("download", `\u2193 ${_("Downloaded")}`, sort),
           renderSortHeading("upload", `\u2191 ${_("Uploaded")}`, sort),
           ...closable ? [
-            E2("div", {
+            element("div", {
               class: cellClass("action"),
               role: "columnheader",
               "aria-label": _("Close")
@@ -5424,11 +5449,11 @@ function cellClass(column) {
   return `fkp_monitoring-page__cell fkp_monitoring-page__cell--${column}`;
 }
 function renderHeading(column, text2) {
-  return E2("div", { class: cellClass(column), role: "columnheader" }, text2);
+  return element("div", { class: cellClass(column), role: "columnheader" }, text2);
 }
 function renderSortHeading(column, text2, sort) {
   const order = sort?.column === column ? sort.descending ? "descending" : "ascending" : "none";
-  return E2(
+  return element(
     "div",
     {
       class: [cellClass(column), "fkp_monitoring-page__cell--sortable"].join(
@@ -5438,12 +5463,12 @@ function renderSortHeading(column, text2, sort) {
       "aria-sort": order
     },
     [
-      E2(
+      element(
         "button",
         { class: "fkp_monitoring-page__sort", type: "button", value: column },
         [
-          E2("span", { class: "fkp_monitoring-page__sort-label" }, text2),
-          E2(
+          element("span", { class: "fkp_monitoring-page__sort-label" }, text2),
+          element(
             "span",
             { class: "fkp_monitoring-page__sort-icon", "aria-hidden": "true" },
             [renderChevronUpIcon24()]
@@ -5454,7 +5479,7 @@ function renderSortHeading(column, text2, sort) {
   );
 }
 function renderValue(text2, className, fullValue = text2) {
-  return E2(
+  return element(
     "span",
     {
       class: ["fkp_monitoring-page__value", className].filter(Boolean).join(" "),
@@ -5472,7 +5497,7 @@ function renderSource(item) {
       label
     );
   }
-  const detail = item.sourceDetail && E2("span", { class: "fkp_monitoring-page__muted" }, item.sourceDetail);
+  const detail = item.sourceDetail && element("span", { class: "fkp_monitoring-page__muted" }, item.sourceDetail);
   return renderValue(
     [item.sourceName, detail ? " " : "", detail].filter(
       Boolean
@@ -5488,7 +5513,7 @@ function renderRoute(route, direct) {
   ) : renderValue(route, "fkp_monitoring-page__tag");
 }
 function renderRowAction(id) {
-  return E2(
+  return element(
     "button",
     {
       class: "btn cbi-button fkp_monitoring-page__row-action",
@@ -5501,7 +5526,7 @@ function renderRowAction(id) {
   );
 }
 function renderRow(item, closable) {
-  return E2(
+  return element(
     "div",
     {
       class: [
@@ -5512,29 +5537,29 @@ function renderRow(item, closable) {
       "data-connection-id": item.id
     },
     [
-      E2("div", { class: cellClass("host"), role: "cell" }, [
+      element("div", { class: cellClass("host"), role: "cell" }, [
         renderValue(item.host, "fkp_monitoring-page__host")
       ]),
-      E2("div", { class: cellClass("source"), role: "cell" }, [
+      element("div", { class: cellClass("source"), role: "cell" }, [
         renderSource(item)
       ]),
-      E2("div", { class: cellClass("route"), role: "cell" }, [
+      element("div", { class: cellClass("route"), role: "cell" }, [
         renderRoute(item.route, item.direct)
       ]),
-      E2("div", { class: cellClass("network"), role: "cell" }, [
+      element("div", { class: cellClass("network"), role: "cell" }, [
         renderValue(item.network, "fkp_monitoring-page__network")
       ]),
-      E2("div", { class: cellClass("time"), role: "cell" }, [
+      element("div", { class: cellClass("time"), role: "cell" }, [
         renderValue(item.time, "fkp_monitoring-page__metric")
       ]),
-      E2("div", { class: cellClass("download"), role: "cell" }, [
+      element("div", { class: cellClass("download"), role: "cell" }, [
         renderValue(item.download, "fkp_monitoring-page__metric")
       ]),
-      E2("div", { class: cellClass("upload"), role: "cell" }, [
+      element("div", { class: cellClass("upload"), role: "cell" }, [
         renderValue(item.upload, "fkp_monitoring-page__metric")
       ]),
       ...closable ? [
-        E2("div", { class: cellClass("action"), role: "cell" }, [
+        element("div", { class: cellClass("action"), role: "cell" }, [
           renderRowAction(item.id)
         ])
       ] : []
@@ -5550,14 +5575,14 @@ function renderConnectionList(items, options) {
 function renderConnectionListState(message, options) {
   return renderList(
     [
-      E2(
+      element(
         "div",
         {
           class: "fkp_monitoring-page__row fkp_monitoring-page__row--state",
           role: "row"
         },
         [
-          E2(
+          element(
             "div",
             {
               class: [
@@ -5567,7 +5592,7 @@ function renderConnectionListState(message, options) {
               role: "cell"
             },
             [
-              E2(
+              element(
                 "div",
                 {
                   class: ["fkp_monitoring-page__state", options.className].filter(Boolean).join(" ")
@@ -6024,9 +6049,9 @@ function renderFilterOptions(id, allLabel, options, selected) {
   if (signature !== filterSignatures[id]) {
     filterSignatures[id] = signature;
     select.replaceChildren(
-      E2("option", { value: ALL_FILTER_VALUE }, allLabel),
+      element("option", { value: ALL_FILTER_VALUE }, allLabel),
       ...options.map(
-        (option) => E2("option", { value: option.value }, option.label)
+        (option) => element("option", { value: option.value }, option.label)
       )
     );
   }
@@ -6054,10 +6079,10 @@ function renderTab(tab, label, count, active) {
   if (!tab) return;
   tab.className = active ? "cbi-tab" : "cbi-tab-disabled";
   tab.replaceChildren(
-    E2("a", { href: "#" }, [
+    element("a", { href: "#" }, [
       label,
       " ",
-      E2("span", { class: "fkp_monitoring-page__tab-count" }, String(count))
+      element("span", { class: "fkp_monitoring-page__tab-count" }, String(count))
     ])
   );
 }
@@ -7140,7 +7165,6 @@ return baseclass.extend({
   DOMAIN_LIST_OPTIONS,
   DashboardTab,
   DiagnosticTab,
-  E: E2,
   ERROR_POLL_INTERVAL,
   FAKEIP_CHECK_DOMAIN,
   FETCH_TIMEOUT,
