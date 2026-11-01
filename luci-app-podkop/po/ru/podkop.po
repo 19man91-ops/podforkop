@@ -647,6 +647,12 @@ msgstr "Выберите тип списка для добавления пол�
 msgid "Select the log level for sing-box"
 msgstr "Выберите уровень логов для sing-box"
 
+msgid "Select a section to edit its connection and traffic rules. Drag rows with mouse to reorder rules precedence."
+msgstr "Выберите секцию, чтобы настроить подключение и правила маршрутизации. Перетаскивайте строки мышью, чтобы изменить приоритет правил."
+
+msgid "Drag row with mouse to reorder sections"
+msgstr "Перетащите строку мышью, чтобы изменить порядок секций"
+
 msgid "Select the network interface from which the traffic will originate"
 msgstr "Выберите сетевой интерфейс, с которого будет исходить трафик"
 

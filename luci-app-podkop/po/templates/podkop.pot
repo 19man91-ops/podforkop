@@ -895,6 +895,12 @@ msgid "Select the log level for sing-box"
 msgstr ""
 
 #: ..\luci-app-podkop\htdocs\luci-static\resources\view\podkop\settings.js:90
+msgid "Select a section to edit its connection and traffic rules. Drag rows with mouse to reorder rules precedence."
+msgstr ""
+
+msgid "Drag row with mouse to reorder sections"
+msgstr ""
+
 msgid "Select the network interface from which the traffic will originate"
 msgstr ""
 

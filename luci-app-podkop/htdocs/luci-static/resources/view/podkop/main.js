@@ -4780,6 +4780,25 @@ ${PartialStyles}
     margin-bottom: -32px;
 }
 
+/* Drag and Drop for Section Rows */
+#cbi-podkop-section .cbi-section-table-row {
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+#cbi-podkop-section .cbi-section-table-row[draggable="true"] {
+    cursor: grab;
+}
+#cbi-podkop-section .cbi-section-table-row.dragging {
+    opacity: 0.35 !important;
+    cursor: grabbing !important;
+    background-color: rgba(16, 185, 129, 0.15) !important;
+}
+#cbi-podkop-section .cbi-section-table-row.drag-target-above {
+    border-top: 3px solid #10b981 !important;
+}
+#cbi-podkop-section .cbi-section-table-row.drag-target-below {
+    border-bottom: 3px solid #10b981 !important;
+}
+
 /* Centered class helper */
 .centered {
     display: flex;

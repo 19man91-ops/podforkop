@@ -28,7 +28,7 @@ stop_service() {
 }
 
 reload_service() {
-    /usr/bin/podkop reload > /dev/null 2>&1
+    /etc/init.d/podkop restart
 }
 
 service_triggers() {
@@ -41,6 +41,7 @@ service_triggers() {
     PROCD_RELOAD_DELAY=$badwan_reload_delay
 
     procd_open_trigger
+    procd_add_reload_trigger "podkop"
     procd_add_config_trigger "config.change" "$NAME" "$initscript" restart 'on_config_change'
 
     if [ "$enable_badwan_interface_monitoring" = "1" ]; then
