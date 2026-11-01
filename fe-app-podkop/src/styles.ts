@@ -30,6 +30,8 @@ ${PartialStyles}
 }
 #cbi-podkop-section .cbi-section-table-row[draggable="true"] {
     cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
 }
 #cbi-podkop-section .cbi-section-table-row.dragging {
     opacity: 0.35 !important;

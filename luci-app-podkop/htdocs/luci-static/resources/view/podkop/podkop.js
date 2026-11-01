@@ -25,7 +25,9 @@ function enableRowDragAndDrop(containerNode) {
   if (!containerNode) return;
 
   function initRows() {
-    const table = containerNode.querySelector("#cbi-podkop-section .cbi-section-table");
+    const table =
+      containerNode.querySelector("#cbi-podkop-section .cbi-section-table") ||
+      containerNode.querySelector(".cbi-section-table");
     if (!table) return;
 
     const tbody = table.querySelector("tbody") || table;
@@ -36,17 +38,21 @@ function enableRowDragAndDrop(containerNode) {
       row.dataset.dndInit = "1";
 
       row.setAttribute("draggable", "true");
+      row.style.cursor = "grab";
+      row.style.userSelect = "none";
+      row.style.webkitUserSelect = "none";
       row.title = _("Drag row with mouse to reorder sections");
 
       row.addEventListener("dragstart", (e) => {
         const target = e.target;
         if (
           target &&
-          (target.tagName === "INPUT" ||
-            target.tagName === "BUTTON" ||
-            target.closest(".cbi-button") ||
-            target.closest("input") ||
-            target.closest(".cbi-value-field"))
+          (target.closest("input") ||
+            target.closest("button") ||
+            target.closest("select") ||
+            target.closest("textarea") ||
+            target.closest("a") ||
+            target.closest(".cbi-button"))
         ) {
           e.preventDefault();
           return;
@@ -54,12 +60,14 @@ function enableRowDragAndDrop(containerNode) {
 
         window._podkopDraggedRow = row;
         row.classList.add("dragging");
+        row.style.cursor = "grabbing";
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", row.getAttribute("data-sid") || "");
       });
 
       row.addEventListener("dragend", () => {
         row.classList.remove("dragging");
+        row.style.cursor = "grab";
         window._podkopDraggedRow = null;
         tbody.querySelectorAll(".cbi-section-table-row").forEach((r) => {
           r.classList.remove("drag-target-above", "drag-target-below");
@@ -104,17 +112,15 @@ function enableRowDragAndDrop(containerNode) {
         if (offset < rect.height / 2) {
           tbody.insertBefore(dragged, row);
           if (typeof uci !== "undefined" && typeof uci.move === "function") {
-            uci.move("podkop", draggedSid, targetSid);
+            uci.move("podkop", draggedSid, targetSid, false);
             if (typeof uci.save === "function") {
               uci.save();
             }
           }
         } else {
           tbody.insertBefore(dragged, row.nextSibling);
-          const nextTargetSid =
-            row.nextElementSibling?.getAttribute("data-sid") || null;
           if (typeof uci !== "undefined" && typeof uci.move === "function") {
-            uci.move("podkop", draggedSid, nextTargetSid);
+            uci.move("podkop", draggedSid, targetSid, true);
             if (typeof uci.save === "function") {
               uci.save();
             }
