@@ -1,5 +1,7 @@
 "use strict";
 "require form";
+"require fs";
+"require ui";
 "require uci";
 "require baseclass";
 "require tools.widgets as widgets";
@@ -492,6 +494,63 @@ function createSettingsContent(section, singBoxFeatures = []) {
     }
 
     return validation.message;
+  };
+
+  o = section.option(
+    form.Flag,
+    "telegram_notifications_enabled",
+    _("Telegram notifications"),
+    _(
+      "Send notifications about subscription expiry, failed updates and unavailable proxies to a Telegram chat",
+    ),
+  );
+  o.default = "0";
+  o.rmempty = false;
+
+  o = section.option(
+    form.Value,
+    "telegram_bot_token",
+    _("Telegram bot token"),
+    _("Token from @BotFather, for example 123456:ABC-DEF"),
+  );
+  o.depends("telegram_notifications_enabled", "1");
+  o.rmempty = true;
+
+  o = section.option(
+    form.Value,
+    "telegram_chat_id",
+    _("Telegram chat ID"),
+    _(
+      "Chat or user ID that receives notifications. Send /start to the bot and use the chat id from getUpdates",
+    ),
+  );
+  o.depends("telegram_notifications_enabled", "1");
+  o.rmempty = true;
+
+  o = section.option(
+    form.DummyValue,
+    "_telegram_test",
+    _("Test Telegram notification"),
+  );
+  o.rawhtml = true;
+  o.depends("telegram_notifications_enabled", "1");
+  o.cfgvalue = function () {
+    return E(
+      "button",
+      {
+        class: "btn cbi-button cbi-button-apply",
+        type: "button",
+        click: function () {
+          fs.exec("/usr/bin/podkop", ["telegram_test"]);
+          ui.addNotification(
+            null,
+            E("p", {}, _("Test notification requested")),
+            "info",
+          );
+        },
+      },
+      _("Send test notification"),
+    );
   };
 }
 

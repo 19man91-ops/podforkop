@@ -7,6 +7,9 @@ interface IRenderSectionsProps {
   section: Podkop.OutboundGroup;
   onTestLatency: (tag: string) => void;
   onChooseOutbound: (selector: string, tag: string) => void;
+  onTestSpeed?: (tag: string) => void;
+  speedResults?: Record<string, string>;
+  speedTestingTag?: string;
   latencyFetching: boolean;
 }
 
@@ -33,6 +36,9 @@ export function renderDefaultState({
   section,
   onChooseOutbound,
   onTestLatency,
+  onTestSpeed,
+  speedResults = {},
+  speedTestingTag = '',
   latencyFetching,
 }: IRenderSectionsProps) {
   function testLatency() {
@@ -73,11 +79,25 @@ export function renderDefaultState({
       [
         E('b', {}, renderFlagEmojis(outbound.displayName)),
         E('div', { class: 'pdk_dashboard-page__outbound-grid__item__footer' }, [
-          E(
-            'div',
-            { class: 'pdk_dashboard-page__outbound-grid__item__type' },
+          E('div', { class: 'pdk_dashboard-page__outbound-grid__item__type' }, [
             outbound.type,
-          ),
+            onTestSpeed
+              ? E(
+                  'button',
+                  {
+                    class: 'btn pdk_dashboard-page__outbound-grid__item__speed',
+                    title: _('Download speed test'),
+                    onclick: (event: MouseEvent) => {
+                      event.stopPropagation();
+                      onTestSpeed(outbound.code);
+                    },
+                  },
+                  speedTestingTag === outbound.code
+                    ? '…'
+                    : speedResults[outbound.code] || _('Speed'),
+                )
+              : null,
+          ]),
           E(
             'div',
             { class: getLatencyClass() },

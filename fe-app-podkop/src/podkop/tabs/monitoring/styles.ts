@@ -283,4 +283,23 @@ export const styles = `
     text-align: center;
     color: var(--text-color-medium, #888);
 }
+
+.fkp_monitoring-page__row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+}
+
+.fkp_monitoring-page__add-domain {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fkp_monitoring-page__add-domain-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
 `;

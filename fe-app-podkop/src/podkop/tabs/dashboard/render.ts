@@ -1,4 +1,9 @@
-import { renderSections, renderSubscriptions, renderWidget } from './partials';
+import {
+  renderSections,
+  renderSubscriptions,
+  renderTrafficGraph,
+  renderWidget,
+} from './partials';
 
 export function render() {
   return E(
@@ -31,6 +36,12 @@ export function render() {
           renderWidget({ loading: true, failed: false, title: '', items: [] }),
         ),
       ]),
+      // Real-time traffic graph
+      E(
+        'div',
+        { id: 'dashboard-widget-traffic-graph' },
+        renderTrafficGraph([]),
+      ),
       // Subscription traffic/expiry cards
       E(
         'div',

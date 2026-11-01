@@ -696,6 +696,9 @@ var Podkop;
     AvailableMethods2["GET_SYSTEM_INFO"] = "get_system_info";
     AvailableMethods2["GET_SING_BOX_FEATURES"] = "get_sing_box_features";
     AvailableMethods2["SUBSCRIPTION_INFO"] = "subscription_info";
+    AvailableMethods2["ADD_DOMAIN"] = "add_domain";
+    AvailableMethods2["ADD_DOMAIN_EXCLUSION"] = "add_domain_exclusion";
+    AvailableMethods2["TELEGRAM_TEST"] = "telegram_test";
   })(AvailableMethods = Podkop2.AvailableMethods || (Podkop2.AvailableMethods = {}));
   let AvailableClashAPIMethods;
   ((AvailableClashAPIMethods2) => {
@@ -706,6 +709,7 @@ var Podkop;
     AvailableClashAPIMethods2["GET_CONNECTIONS"] = "get_connections";
     AvailableClashAPIMethods2["CLOSE_CONNECTION"] = "close_connection";
     AvailableClashAPIMethods2["CLOSE_CONNECTIONS"] = "close_connections";
+    AvailableClashAPIMethods2["SPEED_TEST"] = "speed_test";
   })(AvailableClashAPIMethods = Podkop2.AvailableClashAPIMethods || (Podkop2.AvailableClashAPIMethods = {}));
 })(Podkop || (Podkop = {}));
 
@@ -794,6 +798,30 @@ var PodkopShellMethods = {
   refreshSubscriptionInfo: async () => callBaseMethod(
     Podkop.AvailableMethods.SUBSCRIPTION_INFO,
     ["refresh"],
+    "/usr/bin/podkop",
+    6e4
+  ),
+  addDomainToSection: async (section, domain) => callBaseMethod(
+    Podkop.AvailableMethods.ADD_DOMAIN,
+    [section, domain],
+    "/usr/bin/podkop",
+    3e4
+  ),
+  addDomainToExclusion: async (domain) => callBaseMethod(
+    Podkop.AvailableMethods.ADD_DOMAIN_EXCLUSION,
+    [domain],
+    "/usr/bin/podkop",
+    3e4
+  ),
+  telegramTest: async () => callBaseMethod(
+    Podkop.AvailableMethods.TELEGRAM_TEST,
+    [],
+    "/usr/bin/podkop",
+    2e4
+  ),
+  speedTest: async (tag) => callBaseMethod(
+    Podkop.AvailableMethods.CLASH_API,
+    [Podkop.AvailableClashAPIMethods.SPEED_TEST, tag],
     "/usr/bin/podkop",
     6e4
   )
@@ -2503,6 +2531,9 @@ function renderDefaultState({
   section,
   onChooseOutbound,
   onTestLatency,
+  onTestSpeed,
+  speedResults: speedResults2 = {},
+  speedTestingTag: speedTestingTag2 = "",
   latencyFetching
 }) {
   function testLatency() {
@@ -2535,11 +2566,21 @@ function renderDefaultState({
       [
         E("b", {}, renderFlagEmojis(outbound.displayName)),
         E("div", { class: "pdk_dashboard-page__outbound-grid__item__footer" }, [
-          E(
-            "div",
-            { class: "pdk_dashboard-page__outbound-grid__item__type" },
-            outbound.type
-          ),
+          E("div", { class: "pdk_dashboard-page__outbound-grid__item__type" }, [
+            outbound.type,
+            onTestSpeed ? E(
+              "button",
+              {
+                class: "btn pdk_dashboard-page__outbound-grid__item__speed",
+                title: _("Download speed test"),
+                onclick: (event) => {
+                  event.stopPropagation();
+                  onTestSpeed(outbound.code);
+                }
+              },
+              speedTestingTag2 === outbound.code ? "\u2026" : speedResults2[outbound.code] || _("Speed")
+            ) : null
+          ]),
           E(
             "div",
             { class: getLatencyClass() },
@@ -2915,6 +2956,69 @@ function renderSubscriptions({
   ]);
 }
 
+// src/podkop/tabs/dashboard/trafficGraph.ts
+var TRAFFIC_GRAPH_MAX_BARS = 40;
+function toNonNegative(value) {
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+function buildTrafficBars(history, maxBars = TRAFFIC_GRAPH_MAX_BARS) {
+  const slice = history.slice(-maxBars);
+  if (slice.length === 0) {
+    return [];
+  }
+  let max = 1;
+  slice.forEach((sample) => {
+    max = Math.max(max, toNonNegative(sample.up), toNonNegative(sample.down));
+  });
+  return slice.map((sample) => ({
+    upPercent: Math.round(toNonNegative(sample.up) / max * 100),
+    downPercent: Math.round(toNonNegative(sample.down) / max * 100)
+  }));
+}
+
+// src/podkop/tabs/dashboard/partials/renderTrafficGraph.ts
+function renderBars(history) {
+  const bars = buildTrafficBars(history, TRAFFIC_GRAPH_MAX_BARS);
+  return E(
+    "div",
+    { class: "pdk_dashboard-page__traffic-graph__bars" },
+    bars.map(
+      (bar) => E("div", { class: "pdk_dashboard-page__traffic-graph__column" }, [
+        E("span", {
+          class: "pdk_dashboard-page__traffic-graph__bar pdk_dashboard-page__traffic-graph__bar--down",
+          style: `height: ${bar.downPercent}%`
+        }),
+        E("span", {
+          class: "pdk_dashboard-page__traffic-graph__bar pdk_dashboard-page__traffic-graph__bar--up",
+          style: `height: ${bar.upPercent}%`
+        })
+      ])
+    )
+  );
+}
+function renderTrafficGraph(history) {
+  const last = history[history.length - 1];
+  return E("div", { class: "pdk_dashboard-page__traffic-graph" }, [
+    E("div", { class: "pdk_dashboard-page__traffic-graph__header" }, [
+      E("b", {}, _("Traffic graph")),
+      last ? E(
+        "span",
+        {
+          class: "pdk_dashboard-page__traffic-graph__legend pdk_dashboard-page__subscriptions__row--muted"
+        },
+        `\u2193 ${prettyBytes(last.down)}/s \xB7 \u2191 ${prettyBytes(last.up)}/s`
+      ) : null
+    ]),
+    history.length ? renderBars(history) : E(
+      "div",
+      {
+        class: "pdk_dashboard-page__traffic-graph__empty pdk_dashboard-page__subscriptions__row--muted"
+      },
+      _("Waiting for traffic data...")
+    )
+  ]);
+}
+
 // src/podkop/tabs/dashboard/partials/renderWidget.ts
 function renderFailedState2() {
   return E(
@@ -3009,6 +3113,12 @@ function render() {
           renderWidget({ loading: true, failed: false, title: "", items: [] })
         )
       ]),
+      // Real-time traffic graph
+      E(
+        "div",
+        { id: "dashboard-widget-traffic-graph" },
+        renderTrafficGraph([])
+      ),
       // Subscription traffic/expiry cards
       E(
         "div",
@@ -3074,6 +3184,10 @@ async function fetchServicesInfo() {
 }
 
 // src/podkop/tabs/dashboard/initController.ts
+var trafficHistory = [];
+var TRAFFIC_HISTORY_LIMIT = 40;
+var speedResults = {};
+var speedTestingTag = "";
 var SUBSCRIPTIONS_STALE_SECONDS = 30 * 60;
 var SUBSCRIPTIONS_AUTO_REFRESH_COOLDOWN_MS = 10 * 60 * 1e3;
 var lastSubscriptionsAutoRefreshAt = 0;
@@ -3159,6 +3273,13 @@ async function connectToClashSockets() {
     `${getClashWsUrl()}/traffic?token=${clashApiSecret}`,
     (msg) => {
       const parsedMsg = JSON.parse(msg);
+      trafficHistory.push({
+        up: Number(parsedMsg.up) || 0,
+        down: Number(parsedMsg.down) || 0
+      });
+      if (trafficHistory.length > TRAFFIC_HISTORY_LIMIT) {
+        trafficHistory.shift();
+      }
       store.set({
         bandwidthWidget: {
           loading: false,
@@ -3230,8 +3351,40 @@ async function connectToClashSockets() {
   );
 }
 async function handleChooseOutbound(selector, tag) {
-  await PodkopShellMethods.setClashApiGroupProxy(selector, tag);
-  await fetchDashboardSections();
+  try {
+    const response = await PodkopShellMethods.setClashApiGroupProxy(
+      selector,
+      tag
+    );
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+    await fetchDashboardSections();
+  } catch (error) {
+    logger.error("[DASHBOARD]", "handleChooseOutbound failed", error);
+    ui.addNotification(
+      null,
+      E("p", {}, _("Failed to switch the active server")),
+      "error"
+    );
+  }
+}
+async function handleTestSpeed(tag) {
+  if (!tag || speedTestingTag === tag) {
+    return;
+  }
+  speedTestingTag = tag;
+  await renderSectionsWidget();
+  try {
+    const response = await PodkopShellMethods.speedTest(tag);
+    const result = response.success ? response.data : null;
+    speedResults[tag] = result?.success && typeof result.mbps === "number" ? `${result.mbps} Mbps` : "N/A";
+  } catch (error) {
+    logger.error("[DASHBOARD]", "handleTestSpeed failed", error);
+    speedResults[tag] = "N/A";
+  }
+  speedTestingTag = "";
+  await renderSectionsWidget();
 }
 async function handleTestGroupLatency(tag) {
   store.set({
@@ -3303,12 +3456,24 @@ async function renderSectionsWidget() {
       },
       onChooseOutbound: (selector, tag) => {
         handleChooseOutbound(selector, tag);
-      }
+      },
+      onTestSpeed: (tag) => {
+        void handleTestSpeed(tag);
+      },
+      speedResults,
+      speedTestingTag
     })
   );
   return preserveScrollForPage(() => {
     container.replaceChildren(...renderedWidgets);
   });
+}
+async function renderTrafficGraphWidget() {
+  const container = document.getElementById("dashboard-widget-traffic-graph");
+  if (!container) {
+    return;
+  }
+  container.replaceChildren(renderTrafficGraph(trafficHistory));
 }
 async function renderSubscriptionsWidget() {
   logger.debug("[DASHBOARD]", "renderSubscriptionsWidget");
@@ -3460,6 +3625,7 @@ async function onStoreUpdate(next, prev, diff) {
   }
   if (diff.bandwidthWidget) {
     renderBandwidthWidget();
+    renderTrafficGraphWidget();
   }
   if (diff.trafficTotalWidget) {
     renderTrafficTotalWidget();
@@ -3490,6 +3656,9 @@ function onPageUnmount() {
     "sectionsWidget",
     "subscriptionsWidget"
   ]);
+  trafficHistory.length = 0;
+  Object.keys(speedResults).forEach((key) => delete speedResults[key]);
+  speedTestingTag = "";
   socket.resetAll();
 }
 function registerLifecycleListeners() {
@@ -3791,6 +3960,69 @@ var styles = `
 
 .pdk_dashboard-page__subscriptions__updated {
     margin-top: auto;
+}
+/* Real-time traffic graph */
+.pdk_dashboard-page__traffic-graph {
+    margin-top: 10px;
+    border: 2px var(--background-color-low, lightgray) solid;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.pdk_dashboard-page__traffic-graph__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.pdk_dashboard-page__traffic-graph__legend {
+    font-size: 0.85em;
+}
+
+.pdk_dashboard-page__traffic-graph__bars {
+    margin-top: 8px;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 64px;
+}
+
+.pdk_dashboard-page__traffic-graph__column {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 1px;
+}
+
+.pdk_dashboard-page__traffic-graph__bar {
+    width: 45%;
+    min-height: 1px;
+    border-radius: 2px 2px 0 0;
+    transition: height 0.2s ease;
+}
+
+.pdk_dashboard-page__traffic-graph__bar--down {
+    background: var(--success-color-medium, green);
+}
+
+.pdk_dashboard-page__traffic-graph__bar--up {
+    background: var(--primary-color-high, dodgerblue);
+}
+
+.pdk_dashboard-page__traffic-graph__empty {
+    padding: 18px 0;
+    text-align: center;
+}
+
+.pdk_dashboard-page__outbound-grid__item__speed {
+    margin-left: 8px;
+    padding: 1px 6px;
+    font-size: 0.8em;
+    line-height: 1.4;
 }
 
 `;
@@ -6609,20 +6841,55 @@ function renderRoute(route, direct) {
     "fkp_monitoring-page__tag fkp_monitoring-page__tag--builtin"
   ) : renderValue(route, "fkp_monitoring-page__tag");
 }
-function renderRowAction(id) {
+function renderRowAction(item, options) {
   return element(
-    "button",
-    {
-      class: "btn cbi-button fkp_monitoring-page__row-action",
-      title: _("Close connection"),
-      "aria-label": _("Close connection"),
-      type: "button",
-      value: id
-    },
-    [renderXIcon24()]
+    "div",
+    { class: "fkp_monitoring-page__row-actions" },
+    [
+      item.rawHost && options.onAddDomain ? element(
+        "button",
+        {
+          class: "btn cbi-button cbi-button-apply",
+          title: _("Add domain to a section"),
+          "aria-label": _("Add domain to a section"),
+          type: "button",
+          click: (event) => {
+            event.stopPropagation();
+            options.onAddDomain?.(item.rawHost);
+          }
+        },
+        "+"
+      ) : null,
+      item.rawHost && options.onExcludeDomain ? element(
+        "button",
+        {
+          class: "btn cbi-button",
+          title: _("Exclude domain from routing"),
+          "aria-label": _("Exclude domain from routing"),
+          type: "button",
+          click: (event) => {
+            event.stopPropagation();
+            options.onExcludeDomain?.(item.rawHost);
+          }
+        },
+        "\u2298"
+      ) : null,
+      element(
+        "button",
+        {
+          class: "btn cbi-button fkp_monitoring-page__row-action",
+          title: _("Close connection"),
+          "aria-label": _("Close connection"),
+          type: "button",
+          value: item.id
+        },
+        [renderXIcon24()]
+      )
+    ].filter(Boolean)
   );
 }
-function renderRow(item, closable) {
+function renderRow(item, options) {
+  const closable = options.closable;
   return element(
     "div",
     {
@@ -6657,7 +6924,7 @@ function renderRow(item, closable) {
       ]),
       ...closable ? [
         element("div", { class: cellClass("action"), role: "cell" }, [
-          renderRowAction(item.id)
+          renderRowAction(item, options)
         ])
       ] : []
     ]
@@ -6665,7 +6932,7 @@ function renderRow(item, closable) {
 }
 function renderConnectionList(items, options) {
   return renderList(
-    items.map((item) => renderRow(item, options.closable)),
+    items.map((item) => renderRow(item, options)),
     options
   );
 }
@@ -7230,6 +7497,7 @@ function toListItem(connection) {
   return {
     id: connection.id,
     host: getTargetCellParts(connection).primary,
+    rawHost: normalizeString(connection.metadata?.host),
     sourceName: source.name,
     sourceDetail: source.detail,
     system: source.kind === "system",
@@ -7247,6 +7515,73 @@ function isTextSelectionInsideList() {
   const selection = window.getSelection?.();
   if (!list || !selection || selection.isCollapsed) return false;
   return list.contains(selection.anchorNode) || list.contains(selection.focusNode);
+}
+async function handleExcludeDomain(host) {
+  try {
+    const response = await PodkopShellMethods.addDomainToExclusion(host);
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+    showToast(_("Domain excluded from routing"), "success");
+  } catch (error) {
+    logger.error("[MONITORING]", "handleExcludeDomain failed", error);
+    showToast(_("Failed to add domain"), "error");
+  }
+}
+async function handleAddDomain(host) {
+  try {
+    const sections = await CustomPodkopMethods.getConfigSections();
+    const targets = sections.filter(
+      (section) => section[".type"] === "section" && section.connection_type !== "block" && section.connection_type !== "exclusion"
+    );
+    const buttons = targets.map(
+      (section) => element(
+        "button",
+        {
+          class: "btn cbi-button",
+          click: async () => {
+            ui.hideModal();
+            try {
+              const response = await PodkopShellMethods.addDomainToSection(
+                section[".name"],
+                host
+              );
+              if (!response.success) {
+                throw new Error(response.error);
+              }
+              showToast(_("Domain added to the section"), "success");
+            } catch (error) {
+              logger.error("[MONITORING]", "handleAddDomain failed", error);
+              showToast(_("Failed to add domain"), "error");
+            }
+          }
+        },
+        section[".name"]
+      )
+    );
+    ui.showModal(
+      _("Add domain to a section"),
+      element("div", { class: "fkp_monitoring-page__add-domain" }, [
+        element("p", {}, `${host}`),
+        element(
+          "div",
+          { class: "fkp_monitoring-page__add-domain-list" },
+          buttons.length ? buttons : [_("No suitable sections")]
+        ),
+        element(
+          "button",
+          {
+            class: "btn cbi-button",
+            click: () => ui.hideModal()
+          },
+          _("Cancel")
+        )
+      ])
+    );
+  } catch (error) {
+    logger.error("[MONITORING]", "handleAddDomain failed", error);
+    showToast(_("Failed to add domain"), "error");
+  }
 }
 function renderConnections(options = {}) {
   const container = document.getElementById("monitoring-connections");
@@ -7287,7 +7622,9 @@ function renderConnections(options = {}) {
   container.replaceChildren(
     renderConnectionList(visibleConnections.map(toListItem), {
       closable,
-      sort
+      sort,
+      onAddDomain: handleAddDomain,
+      onExcludeDomain: handleExcludeDomain
     })
   );
 }
@@ -8016,6 +8353,25 @@ var styles5 = `
     padding: 32px;
     text-align: center;
     color: var(--text-color-medium, #888);
+}
+
+.fkp_monitoring-page__row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+}
+
+.fkp_monitoring-page__add-domain {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fkp_monitoring-page__add-domain-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 `;
 

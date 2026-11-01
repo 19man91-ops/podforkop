@@ -539,6 +539,10 @@ subscription_info_refresh() {
     mv "$cache_tmp" "$PODKOP_SUBSCRIPTION_INFO_CACHE"
     chmod 600 "$PODKOP_SUBSCRIPTION_INFO_CACHE" 2>/dev/null || true
     rm -f "$sections_file"
+
+    if type telegram_notify_expiring_subscriptions >/dev/null 2>&1; then
+        telegram_notify_expiring_subscriptions >/dev/null 2>&1 || true
+    fi
 }
 
 # Prints the cached subscription info; "refresh" as the first argument
@@ -567,9 +571,11 @@ subscription_update() {
         if /usr/bin/podkop clash_api update_provider >/dev/null 2>&1 || /etc/init.d/sing-box reload 2>/dev/null; then
             log "Proxy subscriptions updated successfully"
             subscription_info_refresh >/dev/null 2>&1 || true
+            type telegram_notify_update_success >/dev/null 2>&1 && telegram_notify_update_success || true
             return 0
         else
             log "Failed to update proxy subscriptions via Clash API / reload" "warn"
+            type telegram_notify_update_failure >/dev/null 2>&1 && telegram_notify_update_failure || true
             return 1
         fi
     fi
@@ -577,6 +583,7 @@ subscription_update() {
     subscription_info_refresh >/dev/null 2>&1 || true
     if [ "$PODKOP_SUBSCRIPTIONS_FAILED" = "1" ]; then
         log "One or more proxy subscriptions could not be updated; cached data was left unchanged" "warn"
+        type telegram_notify_update_failure >/dev/null 2>&1 && telegram_notify_update_failure || true
         return 1
     fi
     if [ "$PODKOP_SUBSCRIPTIONS_CHANGED" = "1" ]; then
@@ -585,5 +592,6 @@ subscription_update() {
     else
         log "Proxy subscriptions are up to date"
     fi
+    type telegram_notify_update_success >/dev/null 2>&1 && telegram_notify_update_success || true
     return 0
 }

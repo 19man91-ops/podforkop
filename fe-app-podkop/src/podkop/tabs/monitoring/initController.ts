@@ -11,7 +11,7 @@ import { createTabLifecycle } from '../../../helpers/tabLifecycle';
 import { prettyBytes } from '../../../helpers/prettyBytes';
 import { showToast } from '../../../helpers/showToast';
 import { renderSearchIcon24 } from '../../../icons';
-import { CustomPodkopMethods } from '../../methods';
+import { CustomPodkopMethods, PodkopShellMethods } from '../../methods';
 import { loadLocalDevices } from '../../../helpers/localDevices';
 import { logger, socket, store, StoreType } from '../../services';
 import { Podkop } from '../../types';
@@ -611,6 +611,7 @@ function toListItem(connection: MonitoredConnection): ConnectionListItem {
   return {
     id: connection.id,
     host: getTargetCellParts(connection).primary,
+    rawHost: normalizeString(connection.metadata?.host),
     sourceName: source.name,
     sourceDetail: source.detail,
     system: source.kind === 'system',
@@ -631,6 +632,84 @@ function isTextSelectionInsideList(): boolean {
   return (
     list.contains(selection.anchorNode) || list.contains(selection.focusNode)
   );
+}
+
+async function handleExcludeDomain(host: string) {
+  try {
+    const response = await PodkopShellMethods.addDomainToExclusion(host);
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    showToast(_('Domain excluded from routing'), 'success');
+  } catch (error) {
+    logger.error('[MONITORING]', 'handleExcludeDomain failed', error);
+    showToast(_('Failed to add domain'), 'error');
+  }
+}
+
+async function handleAddDomain(host: string) {
+  try {
+    const sections = await CustomPodkopMethods.getConfigSections();
+    const targets = sections.filter(
+      (section) =>
+        section['.type'] === 'section' &&
+        section.connection_type !== 'block' &&
+        section.connection_type !== 'exclusion',
+    );
+
+    const buttons = targets.map((section) =>
+      E(
+        'button',
+        {
+          class: 'btn cbi-button',
+          click: async () => {
+            ui.hideModal();
+            try {
+              const response = await PodkopShellMethods.addDomainToSection(
+                section['.name'],
+                host,
+              );
+
+              if (!response.success) {
+                throw new Error(response.error);
+              }
+
+              showToast(_('Domain added to the section'), 'success');
+            } catch (error) {
+              logger.error('[MONITORING]', 'handleAddDomain failed', error);
+              showToast(_('Failed to add domain'), 'error');
+            }
+          },
+        },
+        section['.name'],
+      ),
+    );
+
+    ui.showModal(
+      _('Add domain to a section'),
+      E('div', { class: 'fkp_monitoring-page__add-domain' }, [
+        E('p', {}, `${host}`),
+        E(
+          'div',
+          { class: 'fkp_monitoring-page__add-domain-list' },
+          buttons.length ? buttons : [_('No suitable sections')],
+        ),
+        E(
+          'button',
+          {
+            class: 'btn cbi-button',
+            click: () => ui.hideModal(),
+          },
+          _('Cancel'),
+        ),
+      ]),
+    );
+  } catch (error) {
+    logger.error('[MONITORING]', 'handleAddDomain failed', error);
+    showToast(_('Failed to add domain'), 'error');
+  }
 }
 
 function renderConnections(options: { force?: boolean } = {}) {
@@ -679,6 +758,8 @@ function renderConnections(options: { force?: boolean } = {}) {
     renderConnectionList(visibleConnections.map(toListItem), {
       closable,
       sort,
+      onAddDomain: handleAddDomain,
+      onExcludeDomain: handleExcludeDomain,
     }),
   );
 }

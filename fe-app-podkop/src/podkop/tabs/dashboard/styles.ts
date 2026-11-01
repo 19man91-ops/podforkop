@@ -262,6 +262,69 @@ export const styles = `
 .pdk_dashboard-page__subscriptions__updated {
     margin-top: auto;
 }
+/* Real-time traffic graph */
+.pdk_dashboard-page__traffic-graph {
+    margin-top: 10px;
+    border: 2px var(--background-color-low, lightgray) solid;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.pdk_dashboard-page__traffic-graph__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.pdk_dashboard-page__traffic-graph__legend {
+    font-size: 0.85em;
+}
+
+.pdk_dashboard-page__traffic-graph__bars {
+    margin-top: 8px;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 64px;
+}
+
+.pdk_dashboard-page__traffic-graph__column {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 1px;
+}
+
+.pdk_dashboard-page__traffic-graph__bar {
+    width: 45%;
+    min-height: 1px;
+    border-radius: 2px 2px 0 0;
+    transition: height 0.2s ease;
+}
+
+.pdk_dashboard-page__traffic-graph__bar--down {
+    background: var(--success-color-medium, green);
+}
+
+.pdk_dashboard-page__traffic-graph__bar--up {
+    background: var(--primary-color-high, dodgerblue);
+}
+
+.pdk_dashboard-page__traffic-graph__empty {
+    padding: 18px 0;
+    text-align: center;
+}
+
+.pdk_dashboard-page__outbound-grid__item__speed {
+    margin-left: 8px;
+    padding: 1px 6px;
+    font-size: 0.8em;
+    line-height: 1.4;
+}
 
 `;
 

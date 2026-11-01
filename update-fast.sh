@@ -72,7 +72,7 @@ fetch_one "${UI_DIR}/fonts/TwemojiCountryFlags.woff2" "ui-TwemojiCountryFlags.wo
 echo "[2/3] Downloading backend files..."
 fetch_one "podkop/files/usr/bin/podkop" "bin-podkop"
 LIB_DIR="podkop/files/usr/lib"
-for file in constants.sh helpers.sh logging.sh nft.sh rulesets.sh \
+for file in constants.sh helpers.sh logging.sh notifications.sh nft.sh rulesets.sh \
     sing_box_config_facade.sh sing_box_config_manager.sh subscriptions.sh; do
     fetch_one "${LIB_DIR}/${file}" "lib-${file}"
 done
@@ -97,7 +97,7 @@ done
 mv "$STAGE/ui-TwemojiCountryFlags.woff2" "/www/luci-static/resources/view/podkop/fonts/TwemojiCountryFlags.woff2"
 
 mv "$STAGE/bin-podkop" /usr/bin/podkop
-for file in constants.sh helpers.sh logging.sh nft.sh rulesets.sh \
+for file in constants.sh helpers.sh logging.sh notifications.sh nft.sh rulesets.sh \
     sing_box_config_facade.sh sing_box_config_manager.sh subscriptions.sh; do
     mv "$STAGE/lib-${file}" "/usr/lib/podkop/${file}"
 done

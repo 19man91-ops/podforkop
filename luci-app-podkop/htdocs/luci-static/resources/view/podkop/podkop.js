@@ -22,6 +22,36 @@
 "require view.podkop.diagnostic as diagnostic";
 "require view.podkop.monitoring as monitoring";
 
+async function loadDeviceChoices() {
+  try {
+    const content = await fs.read_direct("/tmp/dhcp.leases");
+    if (!content) return [];
+
+    const seen = new Set();
+    const devices = [];
+
+    content.split("\n").forEach((line) => {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 4) return;
+
+      const ip = parts[2];
+      const name = parts[3];
+      if (!ip || !name || name === "*" || !/^\d+\.\d+\.\d+\.\d+$/.test(ip)) {
+        return;
+      }
+
+      const key = `${name}|${ip}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      devices.push({ ip: ip, name: name });
+    });
+
+    return devices;
+  } catch (_error) {
+    return [];
+  }
+}
+
 function enableRowDragAndDrop(containerNode) {
   if (!containerNode) return;
 
@@ -189,7 +219,8 @@ const EntryPoint = {
     );
 
     // Render section content
-    section.createSectionContent(sectionsSection, singBoxFeatures);
+    const deviceChoices = await loadDeviceChoices();
+    section.createSectionContent(sectionsSection, singBoxFeatures, deviceChoices);
 
     // Settings tab
     const settingsSection = podkopMap.section(

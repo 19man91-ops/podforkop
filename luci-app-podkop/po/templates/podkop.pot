@@ -1430,3 +1430,67 @@ msgstr ""
 msgid "Valid until"
 msgstr ""
 
+
+msgid "Add domain to a section"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Chat or user ID that receives notifications. Send /start to the bot and use the chat id from getUpdates"
+msgstr ""
+
+msgid "Domain added to the section"
+msgstr ""
+
+msgid "Domain excluded from routing"
+msgstr ""
+
+msgid "Download speed test"
+msgstr ""
+
+msgid "Exclude domain from routing"
+msgstr ""
+
+msgid "Failed to add domain"
+msgstr ""
+
+msgid "Failed to switch the active server"
+msgstr ""
+
+msgid "No suitable sections"
+msgstr ""
+
+msgid "Send notifications about subscription expiry, failed updates and unavailable proxies to a Telegram chat"
+msgstr ""
+
+msgid "Send test notification"
+msgstr ""
+
+msgid "Speed"
+msgstr ""
+
+msgid "Telegram bot token"
+msgstr ""
+
+msgid "Telegram chat ID"
+msgstr ""
+
+msgid "Telegram notifications"
+msgstr ""
+
+msgid "Test notification requested"
+msgstr ""
+
+msgid "Test Telegram notification"
+msgstr ""
+
+msgid "Token from @BotFather, for example 123456:ABC-DEF"
+msgstr ""
+
+msgid "Traffic graph"
+msgstr ""
+
+msgid "Waiting for traffic data..."
+msgstr ""
+

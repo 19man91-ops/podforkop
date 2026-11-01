@@ -12,11 +12,14 @@ export interface ConnectionListSort {
 interface ConnectionListOptions {
   closable: boolean;
   sort?: ConnectionListSort | null;
+  onAddDomain?: (host: string) => void;
+  onExcludeDomain?: (host: string) => void;
 }
 
 export interface ConnectionListItem {
   id: string;
   host: string;
+  rawHost: string;
   sourceName: string;
   sourceDetail: string;
   system: boolean;
@@ -184,21 +187,64 @@ function renderRoute(route: string, direct: boolean) {
     : renderValue(route, 'fkp_monitoring-page__tag');
 }
 
-function renderRowAction(id: string) {
+function renderRowAction(
+  item: ConnectionListItem,
+  options: ConnectionListOptions,
+) {
   return E(
-    'button',
-    {
-      class: 'btn cbi-button fkp_monitoring-page__row-action',
-      title: _('Close connection'),
-      'aria-label': _('Close connection'),
-      type: 'button',
-      value: id,
-    },
-    [renderXIcon24()],
+    'div',
+    { class: 'fkp_monitoring-page__row-actions' },
+    [
+      item.rawHost && options.onAddDomain
+        ? E(
+            'button',
+            {
+              class: 'btn cbi-button cbi-button-apply',
+              title: _('Add domain to a section'),
+              'aria-label': _('Add domain to a section'),
+              type: 'button',
+              click: (event: MouseEvent) => {
+                event.stopPropagation();
+                options.onAddDomain?.(item.rawHost);
+              },
+            },
+            '+',
+          )
+        : null,
+      item.rawHost && options.onExcludeDomain
+        ? E(
+            'button',
+            {
+              class: 'btn cbi-button',
+              title: _('Exclude domain from routing'),
+              'aria-label': _('Exclude domain from routing'),
+              type: 'button',
+              click: (event: MouseEvent) => {
+                event.stopPropagation();
+                options.onExcludeDomain?.(item.rawHost);
+              },
+            },
+            '⊘',
+          )
+        : null,
+      E(
+        'button',
+        {
+          class: 'btn cbi-button fkp_monitoring-page__row-action',
+          title: _('Close connection'),
+          'aria-label': _('Close connection'),
+          type: 'button',
+          value: item.id,
+        },
+        [renderXIcon24()],
+      ),
+    ].filter(Boolean),
   );
 }
 
-function renderRow(item: ConnectionListItem, closable: boolean) {
+function renderRow(item: ConnectionListItem, options: ConnectionListOptions) {
+  const closable = options.closable;
+
   return E(
     'div',
     {
@@ -236,7 +282,7 @@ function renderRow(item: ConnectionListItem, closable: boolean) {
       ...(closable
         ? [
             E('div', { class: cellClass('action'), role: 'cell' }, [
-              renderRowAction(item.id),
+              renderRowAction(item, options),
             ]),
           ]
         : []),
@@ -249,7 +295,7 @@ export function renderConnectionList(
   options: ConnectionListOptions,
 ) {
   return renderList(
-    items.map((item) => renderRow(item, options.closable)),
+    items.map((item) => renderRow(item, options)),
     options,
   );
 }

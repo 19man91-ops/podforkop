@@ -49,7 +49,7 @@ declare global {
     showModal: (_title: string, _content: HtmlElement) => undefined,
     hideModal: () => undefined,
     addNotification: (
-      _title: string,
+      _title: string | null,
       _children: HtmlElement | HtmlElement[],
       _className?: string,
     ) => undefined,

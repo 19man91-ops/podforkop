@@ -6,9 +6,23 @@ import {
 import { prettyBytes } from '../../../helpers/prettyBytes';
 import { CustomPodkopMethods, PodkopShellMethods } from '../../methods';
 import { logger, socket, store, StoreType } from '../../services';
-import { renderSections, renderSubscriptions, renderWidget } from './partials';
+import {
+  renderSections,
+  renderSubscriptions,
+  renderTrafficGraph,
+  renderWidget,
+} from './partials';
 import { fetchServicesInfo } from '../../fetchers';
 import { getClashApiSecret } from '../../methods/custom/getClashApiSecret';
+import { TrafficSample } from './trafficGraph';
+
+// Real-time traffic graph history (one sample per Clash API message)
+const trafficHistory: TrafficSample[] = [];
+const TRAFFIC_HISTORY_LIMIT = 40;
+
+// Manual per-node download speed test results
+const speedResults: Record<string, string> = {};
+let speedTestingTag = '';
 
 // Subscription info: refresh automatically when the cached data is older than
 // 30 minutes, but not more often than once per 10 minutes per page session.
@@ -126,6 +140,14 @@ async function connectToClashSockets() {
     (msg) => {
       const parsedMsg = JSON.parse(msg);
 
+      trafficHistory.push({
+        up: Number(parsedMsg.up) || 0,
+        down: Number(parsedMsg.down) || 0,
+      });
+      if (trafficHistory.length > TRAFFIC_HISTORY_LIMIT) {
+        trafficHistory.shift();
+      }
+
       store.set({
         bandwidthWidget: {
           loading: false,
@@ -202,8 +224,49 @@ async function connectToClashSockets() {
 // Handlers
 
 async function handleChooseOutbound(selector: string, tag: string) {
-  await PodkopShellMethods.setClashApiGroupProxy(selector, tag);
-  await fetchDashboardSections();
+  try {
+    const response = await PodkopShellMethods.setClashApiGroupProxy(
+      selector,
+      tag,
+    );
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    await fetchDashboardSections();
+  } catch (error) {
+    logger.error('[DASHBOARD]', 'handleChooseOutbound failed', error);
+    ui.addNotification(
+      null,
+      E('p', {}, _('Failed to switch the active server')),
+      'error',
+    );
+  }
+}
+
+async function handleTestSpeed(tag: string) {
+  if (!tag || speedTestingTag === tag) {
+    return;
+  }
+
+  speedTestingTag = tag;
+  await renderSectionsWidget();
+
+  try {
+    const response = await PodkopShellMethods.speedTest(tag);
+    const result = response.success ? response.data : null;
+    speedResults[tag] =
+      result?.success && typeof result.mbps === 'number'
+        ? `${result.mbps} Mbps`
+        : 'N/A';
+  } catch (error) {
+    logger.error('[DASHBOARD]', 'handleTestSpeed failed', error);
+    speedResults[tag] = 'N/A';
+  }
+
+  speedTestingTag = '';
+  await renderSectionsWidget();
 }
 
 async function handleTestGroupLatency(tag: string) {
@@ -287,12 +350,27 @@ async function renderSectionsWidget() {
       onChooseOutbound: (selector, tag) => {
         handleChooseOutbound(selector, tag);
       },
+      onTestSpeed: (tag) => {
+        void handleTestSpeed(tag);
+      },
+      speedResults,
+      speedTestingTag,
     }),
   );
 
   return preserveScrollForPage(() => {
     container!.replaceChildren(...renderedWidgets);
   });
+}
+
+async function renderTrafficGraphWidget() {
+  const container = document.getElementById('dashboard-widget-traffic-graph');
+
+  if (!container) {
+    return;
+  }
+
+  container.replaceChildren(renderTrafficGraph(trafficHistory));
 }
 
 async function renderSubscriptionsWidget() {
@@ -487,6 +565,7 @@ async function onStoreUpdate(
 
   if (diff.bandwidthWidget) {
     renderBandwidthWidget();
+    renderTrafficGraphWidget();
   }
 
   if (diff.trafficTotalWidget) {
@@ -529,6 +608,9 @@ function onPageUnmount() {
     'sectionsWidget',
     'subscriptionsWidget',
   ]);
+  trafficHistory.length = 0;
+  Object.keys(speedResults).forEach((key) => delete speedResults[key]);
+  speedTestingTag = '';
   socket.resetAll();
 }
 

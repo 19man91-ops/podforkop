@@ -20,6 +20,7 @@ check_required_file "$PODKOP_LIB/helpers.sh"
 check_required_file "$PODKOP_LIB/sing_box_config_manager.sh"
 check_required_file "$PODKOP_LIB/sing_box_config_facade.sh"
 check_required_file "$PODKOP_LIB/logging.sh"
+check_required_file "$PODKOP_LIB/notifications.sh"
 check_required_file "$PODKOP_LIB/rulesets.sh"
 . /lib/functions.sh
 . /lib/config/uci.sh
@@ -31,6 +32,7 @@ check_required_file "$PODKOP_LIB/rulesets.sh"
 . "$PODKOP_LIB/sing_box_config_manager.sh"
 . "$PODKOP_LIB/sing_box_config_facade.sh"
 . "$PODKOP_LIB/logging.sh"
+. "$PODKOP_LIB/notifications.sh"
 . "$PODKOP_LIB/rulesets.sh"
 
 config_load "$PODKOP_CONFIG"
@@ -2003,6 +2005,7 @@ check_proxy() {
             else
                 nolog "Error response: $response"
             fi
+            telegram_notify_proxies_down 2>/dev/null || true
             return 1
         fi
     done
@@ -2165,6 +2168,7 @@ show_config() {
         -e "s@\\(option dns_server '[^/]*\\)/[^']*'@\\1/MASKED'@g" \
         -e "s@\\(option domain_resolver_dns_server '[^/]*\\)/[^']*'@\\1/MASKED'@g" \
         -e 's/\(option yacd_secret_key\).*/\1 '\''MASKED'\''/g' \
+        -e 's/\(option telegram_bot_token\).*/\1 '\''MASKED'\''/g' \
         "$PODKOP_CONFIG" > "$tmp_config"
 
     cat "$tmp_config"
@@ -2683,8 +2687,31 @@ clash_api() {
         curl -sS --fail -X DELETE --header "$auth_header" "$CLASH_URL/connections" | jq .
         ;;
 
+    speed_test)
+        local tag="$2" config_path url start_time end_time elapsed bytes mbps
+        [ -n "$tag" ] || {
+            echo '{"success":false,"error":"missing_tag"}' | jq .
+            return 1
+        }
+        config_get config_path "settings" "config_path"
+        [ -n "$config_path" ] || config_path="/etc/sing-box/config.json"
+        url="${3:-https://speed.cloudflare.com/__down?bytes=2097152}"
+        bytes=2097152
+        start_time=$(date +%s)
+        if sing-box -c "$config_path" tools fetch -o "$tag" "$url" >/dev/null 2>&1; then
+            end_time=$(date +%s)
+            elapsed=$((end_time - start_time))
+            [ "$elapsed" -lt 1 ] && elapsed=1
+            mbps=$((bytes * 8 / elapsed / 1000000))
+            echo "{\"success\":true,\"tag\":\"$tag\",\"mbps\":$mbps,\"seconds\":$elapsed,\"bytes\":$bytes}" | jq .
+        else
+            echo "{\"success\":false,\"tag\":\"$tag\",\"error\":\"download_failed\"}" | jq .
+            return 1
+        fi
+        ;;
+
     *)
-        echo '{"error":"unknown action","available":["get_proxies","get_proxy_latency","get_group_latency","set_group_proxy","get_providers","update_provider","get_connections","close_connection","close_connections"]}' | jq .
+        echo '{"error":"unknown action","available":["get_proxies","get_proxy_latency","get_group_latency","set_group_proxy","get_providers","update_provider","get_connections","close_connection","close_connections","speed_test"]}' | jq .
         return 1
         ;;
     esac
@@ -3013,6 +3040,90 @@ global_check() {
     fi
 }
 
+PODKOP_EXCLUSION_SECTION=""
+podkop_find_exclusion_section() {
+    local section="$1"
+    local connection_type
+
+    connection_type=$(uci_get podkop "$section" "connection_type")
+    [ "$connection_type" = "exclusion" ] && PODKOP_EXCLUSION_SECTION="$section"
+}
+
+# Adds a domain to the user domain list of a section. Used by the Monitoring UI.
+podkop_add_domain_to_section() {
+    local section="$1"
+    local domain="$2"
+    local list_type existing already=0
+
+    domain=$(printf '%s' "$domain" | tr '[:upper:]' '[:lower:]' | sed 's/^\.//')
+    case "$domain" in
+    '' | *[!a-z0-9._-]*)
+        echo '{"success":false,"error":"invalid_domain"}' | jq .
+        return 1
+        ;;
+    esac
+
+    if ! uci show "podkop.$section" >/dev/null 2>&1; then
+        echo "{\"success\":false,\"error\":\"section_not_found\",\"section\":\"$section\"}" | jq .
+        return 1
+    fi
+
+    list_type=$(uci_get podkop "$section" "user_domain_list_type")
+    existing=$(uci_get podkop "$section" "user_domains")
+    [ -n "$existing" ] || existing=$(uci_get podkop "$section" "user_domains_text")
+
+    case " $existing " in
+    *" $domain "*) already=1 ;;
+    esac
+
+    if [ "$list_type" = "text" ]; then
+        [ "$already" -eq 1 ] || {
+            existing=$(uci_get podkop "$section" "user_domains_text")
+            uci_set podkop "$section" "user_domains_text" "${existing:+$existing }$domain"
+        }
+    else
+        uci_set podkop "$section" "user_domain_list_type" "dynamic"
+        [ "$already" -eq 1 ] || uci_add_list podkop "$section" "user_domains" "$domain"
+    fi
+
+    uci_commit podkop
+
+    # Apply the new rule in the background so the UI gets a fast response
+    ( /etc/init.d/podkop reload >/dev/null 2>&1 ) &
+
+    echo "{\"success\":true,\"section\":\"$section\",\"domain\":\"$domain\",\"already_exists\":$([ "$already" -eq 1 ] && echo true || echo false)}" | jq .
+}
+
+podkop_add_domain_to_exclusion() {
+    local domain="$1"
+    local section
+
+    PODKOP_EXCLUSION_SECTION=""
+    config_foreach podkop_find_exclusion_section "section"
+    section="$PODKOP_EXCLUSION_SECTION"
+
+    if [ -z "$section" ]; then
+        section=$(uci add podkop section)
+        uci set "podkop.$section.enabled=1"
+        uci set "podkop.$section.connection_type=exclusion"
+        uci set "podkop.$section.user_domain_list_type=dynamic"
+    fi
+
+    podkop_add_domain_to_section "$section" "$domain"
+}
+
+telegram_test() {
+    local timestamp
+
+    timestamp=$(date '+%Y-%m-%d %H:%M')
+    if telegram_send_message "🧪 Podkop: тестовое уведомление (${timestamp})"; then
+        echo '{"success":true}' | jq .
+    else
+        echo '{"success":false,"error":"telegram_send_failed"}' | jq .
+        return 1
+    fi
+}
+
 show_help() {
     cat << EOF
 Usage: $0 COMMAND
@@ -3027,6 +3138,9 @@ Available commands:
     list_update             Update domain lists
     subscription_update     Update proxy subscriptions
     subscription_info       Show subscription traffic/expiry info in JSON format
+    add_domain              Add a domain to a section's user domain list
+    add_domain_exclusion    Add a domain to the exclusion section
+    telegram_test           Send a test Telegram notification
     check_proxy             Check proxy connectivity
     check_nft               Check NFT rules
     check_nft_rules         Check NFT rules status
@@ -3076,6 +3190,15 @@ subscription_update)
     ;;
 subscription_info)
     subscription_info_show "${2:-}"
+    ;;
+add_domain)
+    podkop_add_domain_to_section "${2:-}" "${3:-}"
+    ;;
+add_domain_exclusion)
+    podkop_add_domain_to_exclusion "${2:-}"
+    ;;
+telegram_test)
+    telegram_test
     ;;
 check_proxy)
     check_proxy

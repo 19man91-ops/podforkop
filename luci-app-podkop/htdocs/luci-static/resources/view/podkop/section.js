@@ -27,7 +27,7 @@ function validateSubscriptionUrl(value) {
   }
 }
 
-function createSectionContent(section, singBoxFeatures = []) {
+function createSectionContent(section, singBoxFeatures = [], deviceChoices = []) {
   let o = section.option(
     form.Flag,
     "enabled",
@@ -872,6 +872,9 @@ function createSectionContent(section, singBoxFeatures = []) {
     ),
   );
   o.placeholder = "192.168.1.2 or 192.168.1.0/24";
+  (deviceChoices || []).forEach(function (device) {
+    o.value(device.ip, device.name + " (" + device.ip + ")");
+  });
   o.rmempty = true;
   o.depends("connection_type", "proxy");
   o.depends("connection_type", "vpn");

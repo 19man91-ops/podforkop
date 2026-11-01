@@ -1091,3 +1091,67 @@ msgstr "Отправлено"
 msgid "Valid until"
 msgstr "Действует до"
 
+
+msgid "Add domain to a section"
+msgstr "Добавить домен в секцию"
+
+msgid "Cancel"
+msgstr "Отмена"
+
+msgid "Chat or user ID that receives notifications. Send /start to the bot and use the chat id from getUpdates"
+msgstr "ID чата или пользователя для уведомлений. Отправьте /start боту и возьмите chat id из getUpdates"
+
+msgid "Domain added to the section"
+msgstr "Домен добавлен в секцию"
+
+msgid "Domain excluded from routing"
+msgstr "Домен исключён из маршрутизации"
+
+msgid "Download speed test"
+msgstr "Тест скорости скачивания"
+
+msgid "Exclude domain from routing"
+msgstr "Исключить домен из маршрутизации"
+
+msgid "Failed to add domain"
+msgstr "Не удалось добавить домен"
+
+msgid "Failed to switch the active server"
+msgstr "Не удалось переключить активный сервер"
+
+msgid "No suitable sections"
+msgstr "Нет подходящих секций"
+
+msgid "Send notifications about subscription expiry, failed updates and unavailable proxies to a Telegram chat"
+msgstr "Отправлять уведомления о сроке подписки, ошибках обновления и недоступных прокси в Telegram-чат"
+
+msgid "Send test notification"
+msgstr "Отправить тестовое уведомление"
+
+msgid "Speed"
+msgstr "Скорость"
+
+msgid "Telegram bot token"
+msgstr "Токен Telegram-бота"
+
+msgid "Telegram chat ID"
+msgstr "ID чата Telegram"
+
+msgid "Telegram notifications"
+msgstr "Уведомления в Telegram"
+
+msgid "Test notification requested"
+msgstr "Тестовое уведомление отправлено"
+
+msgid "Test Telegram notification"
+msgstr "Проверка уведомления Telegram"
+
+msgid "Token from @BotFather, for example 123456:ABC-DEF"
+msgstr "Токен от @BotFather, например 123456:ABC-DEF"
+
+msgid "Traffic graph"
+msgstr "График трафика"
+
+msgid "Waiting for traffic data..."
+msgstr "Ожидание данных о трафике..."
+

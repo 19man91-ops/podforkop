@@ -113,4 +113,32 @@ export const PodkopShellMethods = {
       '/usr/bin/podkop',
       60000,
     ),
+  addDomainToSection: async (section: string, domain: string) =>
+    callBaseMethod<Podkop.AddDomainResult>(
+      Podkop.AvailableMethods.ADD_DOMAIN,
+      [section, domain],
+      '/usr/bin/podkop',
+      30000,
+    ),
+  addDomainToExclusion: async (domain: string) =>
+    callBaseMethod<Podkop.AddDomainResult>(
+      Podkop.AvailableMethods.ADD_DOMAIN_EXCLUSION,
+      [domain],
+      '/usr/bin/podkop',
+      30000,
+    ),
+  telegramTest: async () =>
+    callBaseMethod<Podkop.TelegramTestResult>(
+      Podkop.AvailableMethods.TELEGRAM_TEST,
+      [],
+      '/usr/bin/podkop',
+      20000,
+    ),
+  speedTest: async (tag: string) =>
+    callBaseMethod<Podkop.SpeedTestResult>(
+      Podkop.AvailableMethods.CLASH_API,
+      [Podkop.AvailableClashAPIMethods.SPEED_TEST, tag],
+      '/usr/bin/podkop',
+      60000,
+    ),
 };

@@ -65,6 +65,9 @@ export namespace Podkop {
     GET_SYSTEM_INFO = 'get_system_info',
     GET_SING_BOX_FEATURES = 'get_sing_box_features',
     SUBSCRIPTION_INFO = 'subscription_info',
+    ADD_DOMAIN = 'add_domain',
+    ADD_DOMAIN_EXCLUSION = 'add_domain_exclusion',
+    TELEGRAM_TEST = 'telegram_test',
   }
 
   export enum AvailableClashAPIMethods {
@@ -75,6 +78,7 @@ export namespace Podkop {
     GET_CONNECTIONS = 'get_connections',
     CLOSE_CONNECTION = 'close_connection',
     CLOSE_CONNECTIONS = 'close_connections',
+    SPEED_TEST = 'speed_test',
   }
 
   export interface ClashConnection {
@@ -147,6 +151,28 @@ export namespace Podkop {
   export interface SubscriptionInfo {
     updated_at: number;
     sections: SubscriptionSectionInfo[];
+  }
+
+  export interface AddDomainResult {
+    success: boolean;
+    section?: string;
+    domain?: string;
+    already_exists?: boolean;
+    error?: string;
+  }
+
+  export interface SpeedTestResult {
+    success: boolean;
+    tag?: string;
+    mbps?: number;
+    seconds?: number;
+    bytes?: number;
+    error?: string;
+  }
+
+  export interface TelegramTestResult {
+    success: boolean;
+    error?: string;
   }
 
   export interface ConfigProxyUrlTestSection {
