@@ -25,7 +25,20 @@ export default defineConfig({
         code = code.replace(
             /export\s*{([\s\S]*?)}/,
             (match, group) => {
-                return `return baseclass.extend({${group}})`;
+                const objectProps = group
+                    .split(',')
+                    .map((item) => {
+                        const trimmed = item.trim();
+                        if (!trimmed) return '';
+                        const parts = trimmed.split(/\s+as\s+/);
+                        if (parts.length === 2) {
+                            return `${parts[1]}: ${parts[0]}`;
+                        }
+                        return trimmed;
+                    })
+                    .filter(Boolean)
+                    .join(',\n  ');
+                return `return baseclass.extend({\n  ${objectProps}\n})`;
             }
         );
 

@@ -8,6 +8,4 @@ function element(...args: unknown[]) {
   return (E as unknown as (...args: unknown[]) => HTMLElement)(...args);
 }
 
-const textE = element as unknown as typeof E;
-
-export { textE as E };
+export const E = element as unknown as typeof globalThis.E;
