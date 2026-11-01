@@ -101,10 +101,10 @@ function createSectionContent(section, singBoxFeatures = []) {
     form.DynamicList,
     "selector_proxy_links",
     _("Selector Proxy Links"),
-    _("vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links")
+    _("vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links; can be used alone or with subscription URLs")
   );
   o.depends("proxy_config_type", "selector");
-  o.rmempty = false;
+  o.rmempty = true;
   o.validate = function (section_id, value) {
     // Optional
     if (!value || value.length === 0) {
@@ -124,9 +124,10 @@ function createSectionContent(section, singBoxFeatures = []) {
     form.DynamicList,
     "selector_subscription_urls",
     _("Selector Subscription URLs"),
-    _("HTTP(S) subscription links returning proxy URLs; refreshed using the global list update frequency"),
+    _("HTTP(S) subscription links returning proxy URLs; can be used alone or together with proxy links and are refreshed using the global list update frequency"),
   );
   o.depends("proxy_config_type", "selector");
+  o.rmempty = true;
   o.validate = function (_section_id, value) {
     return validateSubscriptionUrl(value);
   };
@@ -135,10 +136,10 @@ function createSectionContent(section, singBoxFeatures = []) {
     form.DynamicList,
     "urltest_proxy_links",
     _("URLTest Proxy Links"),
-    _("vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links")
+    _("vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links; can be used alone or with subscription URLs")
   );
   o.depends("proxy_config_type", "urltest");
-  o.rmempty = false;
+  o.rmempty = true;
   o.validate = function (section_id, value) {
     // Optional
     if (!value || value.length === 0) {
@@ -158,9 +159,10 @@ function createSectionContent(section, singBoxFeatures = []) {
     form.DynamicList,
     "urltest_subscription_urls",
     _("URLTest Subscription URLs"),
-    _("HTTP(S) subscription links returning proxy URLs; refreshed using the global list update frequency"),
+    _("HTTP(S) subscription links returning proxy URLs; can be used alone or together with proxy links and are refreshed using the global list update frequency"),
   );
   o.depends("proxy_config_type", "urltest");
+  o.rmempty = true;
   o.validate = function (_section_id, value) {
     return validateSubscriptionUrl(value);
   };

@@ -61,6 +61,18 @@ sing_box_cf_add_proxy_outbound() {
     local url="$3"
     local udp_over_tcp="$4"
 
+    case "$(url_get_scheme "$url")" in
+    hysteria2 | hy2)
+        # The engine's link decoder preserves Hysteria2-specific parameters such as
+        # multi-port ranges and correctly handles escaped credentials. Keep the
+        # local parser as a fallback for stock sing-box builds without the decoder.
+        if sing_box_has_feature "tools.decode-link"; then
+            _add_decoded_proxy_outbound "$config" "$section" "$url"
+            return
+        fi
+        ;;
+    esac
+
     # A link with the xhttp transport is decoded by sing-box itself, before any
     # decoding here: its "extra" parameter is URL-encoded JSON
     case "$(url_get_scheme "$url")" in

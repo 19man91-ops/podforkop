@@ -885,7 +885,7 @@ msgstr ""
 
 #: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:114
 #: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:152
-msgid "HTTP(S) subscription links returning proxy URLs; refreshed using the global list update frequency"
+msgid "HTTP(S) subscription links returning proxy URLs; can be used alone or together with proxy links and are refreshed using the global list update frequency"
 msgstr ""
 
 #: src/podkop/tabs/dashboard/initController.ts:340
@@ -1151,9 +1151,14 @@ msgid "Visit Wiki"
 msgstr ""
 
 #: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:37
-#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:89
-#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:112
+#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:52
+#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:139
 msgid "vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links"
+msgstr ""
+
+#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:104
+#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:139
+msgid "vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links; can be used alone or with subscription URLs"
 msgstr ""
 
 #: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:400

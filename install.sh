@@ -2,6 +2,7 @@
 # shellcheck shell=dash
 
 REPO="https://api.github.com/repos/19man91-ops/podforkop/releases/latest"
+ENGINE_REPO="https://api.github.com/repos/podkop-net/podkop-engine/releases/latest"
 DOWNLOAD_DIR="/tmp/podkop"
 COUNT=3
 
@@ -102,7 +103,6 @@ update_config() {
 
 main() {
     check_system
-    sing_box
 
     /usr/sbin/ntpd -q -p 194.190.168.1 -p 216.239.35.0 -p 216.239.35.4 -p 162.159.200.1 -p 162.159.200.123
 
@@ -163,6 +163,8 @@ main() {
         exit 1
     fi
 
+    install_podkop_engine "$pkg_ext"
+
     for pkg in podkop luci-app-podkop; do
         file=""
         for f in "$DOWNLOAD_DIR"/"$pkg"*; do
@@ -214,6 +216,77 @@ main() {
     find "$DOWNLOAD_DIR" -type f -name '*podkop*' -exec rm {} \;
 }
 
+get_package_arch() {
+    local arch
+
+    if [ "$PKG_IS_APK" -eq 1 ]; then
+        arch=$(apk --print-arch 2>/dev/null)
+    else
+        arch=$(sed -n "s/^DISTRIB_ARCH='\([^']*\)'.*/\1/p" /etc/openwrt_release)
+        if [ -z "$arch" ]; then
+            arch=$(opkg print-architecture | awk '$1 == "arch" && $2 != "all" && $2 != "noarch" { value=$2 } END { print value }')
+        fi
+    fi
+
+    case "$arch" in
+        ""|*[!A-Za-z0-9_.-]*) return 1 ;;
+    esac
+    printf '%s\n' "$arch"
+}
+
+install_podkop_engine() {
+    local pkg_ext="$1"
+    local engine_package arch asset filename filepath attempt
+
+    engine_package="podkop-engine"
+    if pkg_is_installed "podkop-engine-full"; then
+        engine_package="podkop-engine-full"
+    fi
+
+    arch=$(get_package_arch) || {
+        msg "Could not determine the OpenWrt package architecture for podkop-engine."
+        exit 1
+    }
+
+    msg "Finding $engine_package package for $arch..."
+    asset=$(wget -qO- "$ENGINE_REPO" | tr '{' '\n' \
+        | sed -n "s|.*\"url\":\"\([^\"]*/releases/assets/[0-9]*\)\".*\"name\":\"\(${engine_package}_[^\"]*_openwrt_${arch}\.${pkg_ext}\)\".*|\1 \2|p" \
+        | head -n 1)
+    if [ -z "$asset" ]; then
+        msg "Could not find a podkop-engine $pkg_ext package for OpenWrt architecture $arch."
+        exit 1
+    fi
+
+    filename=${asset#* }
+    filepath="$DOWNLOAD_DIR/$filename"
+    attempt=0
+    while [ "$attempt" -lt "$COUNT" ]; do
+        msg "Downloading $filename (attempt $((attempt + 1)))..."
+        if wget -q --header="Accept: application/octet-stream" -O "$filepath" "${asset%% *}" \
+            && [ -s "$filepath" ]; then
+            break
+        fi
+        rm -f "$filepath"
+        attempt=$((attempt + 1))
+    done
+    if [ "$attempt" -eq "$COUNT" ]; then
+        msg "Failed to download $filename after $COUNT attempts."
+        exit 1
+    fi
+
+    if [ "$PKG_IS_APK" -eq 0 ] && ! pkg_is_installed "$engine_package"; then
+        msg "Replacing the OpenWrt sing-box package with podkop-engine..."
+        service podkop stop >/dev/null 2>&1 || true
+        opkg remove --force-depends sing-box sing-box-tiny >/dev/null 2>&1 || true
+    fi
+
+    msg "Installing $filename..."
+    if ! pkg_install "$filepath"; then
+        msg "Could not install podkop-engine. Check available flash space and package-manager output."
+        exit 1
+    fi
+}
+
 check_system() {
     # Get router model
     MODEL=$(cat /tmp/sysinfo/model)
@@ -230,7 +303,7 @@ check_system() {
 
     # Check available space
     AVAILABLE_SPACE=$(df /overlay | awk 'NR==2 {print $4}')
-    REQUIRED_SPACE=15360 # 15MB in KB
+    REQUIRED_SPACE=25600 # 25MB in KB; includes the podkop-engine core
 
     if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_SPACE" ]; then
         msg "Error: Insufficient space in flash"
@@ -292,22 +365,6 @@ check_system() {
                     ;;
         esac
     done
-    fi
-}
-
-sing_box() {
-    if ! pkg_is_installed "^sing-box"; then
-        return
-    fi
-
-    sing_box_version=$(sing-box version | head -n 1 | awk '{print $3}')
-    required_version="1.12.4"
-
-    if [ "$(printf '%s\n%s\n' "$sing_box_version" "$required_version" | sort -V | head -n 1)" != "$required_version" ]; then
-        msg "sing-box version $sing_box_version is older than the required version $required_version."
-        msg "Removing old version..."
-        service podkop stop
-        pkg_remove sing-box
     fi
 }
 

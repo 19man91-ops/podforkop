@@ -641,8 +641,8 @@ msgstr "Ссылки прокси для Selector"
 msgid "Selector Subscription URLs"
 msgstr "Ссылки на подписки для Selector"
 
-msgid "HTTP(S) subscription links returning proxy URLs; refreshed using the global list update frequency"
-msgstr "HTTP(S)-ссылки на подписки со списком прокси; обновляются с общей частотой обновления списков"
+msgid "HTTP(S) subscription links returning proxy URLs; can be used alone or together with proxy links and are refreshed using the global list update frequency"
+msgstr "HTTP(S)-подписки со списком прокси можно использовать отдельно или вместе с прямыми ссылками; обновляются с общей частотой обновления списков"
 
 msgid "Services info"
 msgstr "Информация о сервисах"
@@ -823,6 +823,9 @@ msgstr "Перейти в wiki"
 
 msgid "vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links"
 msgstr ""
+
+msgid "vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links; can be used alone or with subscription URLs"
+msgstr "Ссылки vless://, ss://, trojan://, socks4/5://, hy2/hysteria2://; можно использовать отдельно или вместе с подписками"
 
 msgid "Warning: %s cannot be used together with %s. Previous selections have been removed."
 msgstr "Предупреждение: %s нельзя использовать вместе с %s. Предыдущие варианты были удалены."
