@@ -19,6 +19,10 @@ export const initialDiagnosticStore: Pick<
     sing_box_version: 'loading',
     openwrt_version: 'loading',
     device_model: 'loading',
+    core_family: 'loading',
+    core_variant: 'loading',
+    core_package: 'loading',
+    core_package_version: 'loading',
   },
   diagnosticsActions: {
     restart: {

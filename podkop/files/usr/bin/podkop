@@ -2212,6 +2212,7 @@ get_sing_box_features() {
 
 get_system_info() {
     local podkop_version podkop_latest_version luci_app_version sing_box_version openwrt_version device_model
+    local core_family core_variant core_package core_package_version
 
     podkop_version="$PODKOP_VERSION"
 
@@ -2231,6 +2232,13 @@ get_system_info() {
         sing_box_version="not installed"
     fi
 
+    core_family="$(sing_box_get_core_family)"
+    core_variant="$(sing_box_get_core_variant)"
+    core_package="$(sing_box_get_core_package_name)"
+    core_package_version="$(sing_box_get_core_package_version)"
+    [ -n "$core_variant" ] || core_variant="unknown"
+    [ -n "$core_package_version" ] || core_package_version="unknown"
+
     if [ -f /etc/os-release ]; then
         openwrt_version=$(grep OPENWRT_RELEASE /etc/os-release | cut -d'"' -f2)
         [ -z "$openwrt_version" ] && openwrt_version="unknown"
@@ -2245,7 +2253,29 @@ get_system_info() {
         device_model="unknown"
     fi
 
-    echo "{\"podkop_version\": \"$podkop_version\", \"podkop_latest_version\": \"$podkop_latest_version\", \"luci_app_version\": \"$luci_app_version\", \"sing_box_version\": \"$sing_box_version\", \"openwrt_version\": \"$openwrt_version\", \"device_model\": \"$device_model\"}" | jq .
+    jq -n \
+        --arg podkop_version "$podkop_version" \
+        --arg podkop_latest_version "$podkop_latest_version" \
+        --arg luci_app_version "$luci_app_version" \
+        --arg sing_box_version "$sing_box_version" \
+        --arg openwrt_version "$openwrt_version" \
+        --arg device_model "$device_model" \
+        --arg core_family "$core_family" \
+        --arg core_variant "$core_variant" \
+        --arg core_package "$core_package" \
+        --arg core_package_version "$core_package_version" \
+        '{
+            podkop_version: $podkop_version,
+            podkop_latest_version: $podkop_latest_version,
+            luci_app_version: $luci_app_version,
+            sing_box_version: $sing_box_version,
+            openwrt_version: $openwrt_version,
+            device_model: $device_model,
+            core_family: $core_family,
+            core_variant: $core_variant,
+            core_package: $core_package,
+            core_package_version: $core_package_version
+        }'
 }
 
 get_sing_box_status() {
@@ -2568,6 +2598,35 @@ check_fakeip() {
 #   clash_api set_group_proxy <group_tag> <proxy_tag>
 #######################################
 
+# Runs "sing-box tools fetch" through a specific outbound using a minimal copy
+# of the config (without listeners), so it can run while the service is up.
+podkop_tools_fetch_with_outbound() {
+    local config_path="$1"
+    local tag="$2"
+    local url="$3"
+    local timeout_seconds="${4:-10}"
+    local tmp rc
+
+    [ -n "$config_path" ] && [ -r "$config_path" ] || return 1
+    tmp=$(mktemp)
+    if ! jq 'del(.inbounds) | del(.services) | del(.experimental) | (.log = {level: "error"})' \
+        "$config_path" > "$tmp" 2>/dev/null; then
+        rm -f "$tmp"
+        return 1
+    fi
+
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$timeout_seconds" sing-box -c "$tmp" tools fetch -o "$tag" "$url" 2>/dev/null
+        rc=$?
+    else
+        sing-box -c "$tmp" tools fetch -o "$tag" "$url" 2>/dev/null
+        rc=$?
+    fi
+
+    rm -f "$tmp"
+    return "$rc"
+}
+
 clash_api() {
     local action="$1"
     local clash_api_controller_address CLASH_URL TEST_URL
@@ -2710,7 +2769,7 @@ clash_api() {
         url="${3:-https://speed.cloudflare.com/__down?bytes=2097152}"
         bytes=2097152
         start_time=$(date +%s)
-        if sing-box -c "$config_path" tools fetch -o "$tag" "$url" >/dev/null 2>&1; then
+        if podkop_tools_fetch_with_outbound "$config_path" "$tag" "$url" 15 >/dev/null 2>&1; then
             end_time=$(date +%s)
             elapsed=$((end_time - start_time))
             [ "$elapsed" -lt 1 ] && elapsed=1
@@ -3143,11 +3202,7 @@ PODKOP_PRIVACY_CONFIG_PATH=""
 privacy_test_fetch_json() {
     local tag="$1"
 
-    if command -v timeout >/dev/null 2>&1; then
-        timeout 8 sing-box -c "$PODKOP_PRIVACY_CONFIG_PATH" tools fetch -o "$tag" "https://api.myip.com" 2>/dev/null
-    else
-        sing-box -c "$PODKOP_PRIVACY_CONFIG_PATH" tools fetch -o "$tag" "https://api.myip.com" 2>/dev/null
-    fi
+    podkop_tools_fetch_with_outbound "$PODKOP_PRIVACY_CONFIG_PATH" "$tag" "https://api.myip.com" 8
 }
 
 privacy_test_collect_section() {

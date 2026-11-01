@@ -139,31 +139,33 @@ export const styles = `
     margin-top: 10px;
 }
 
-.pdk_dashboard-page__subscriptions__title {
+.pdk_dashboard-page__subscriptions__header {
     display: flex;
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
 }
 
-.pdk_dashboard-page__subscriptions__title-updated {
+.pdk_dashboard-page__subscriptions__header-updated {
+    margin-left: auto;
     font-size: 0.85em;
 }
 
 .pdk_dashboard-page__subscriptions__grid {
     margin-top: 8px;
-    display: grid;
-    grid-template-columns: repeat(var(--dashboard-grid-columns), 1fr);
-    grid-gap: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .pdk_dashboard-page__subscriptions__card {
+    width: min(320px, 100%);
     border: 2px var(--background-color-low, lightgray) solid;
     border-radius: 4px;
     padding: 10px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
 }
 
 .pdk_dashboard-page__subscriptions__card--warning {
@@ -171,7 +173,7 @@ export const styles = `
 }
 
 .pdk_dashboard-page__subscriptions__card--skeleton {
-    height: 160px;
+    height: 140px;
 }
 
 .pdk_dashboard-page__subscriptions__card-header {
@@ -187,42 +189,48 @@ export const styles = `
     white-space: nowrap;
 }
 
-.pdk_dashboard-page__subscriptions__card-spacer {
-    min-height: 12px;
-}
-
 .pdk_dashboard-page__subscriptions__row {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 4px;
-    line-height: 1.5;
+    line-height: 1.45;
 }
 
-.pdk_dashboard-page__subscriptions__row--muted {
+.pdk_dashboard-page__subscriptions__muted {
     color: var(--text-color-low, gray);
     font-size: 0.9em;
+}
+
+.pdk_dashboard-page__subscriptions__inline-muted {
+    font-size: 1em;
 }
 
 .pdk_dashboard-page__subscriptions__row--error {
     color: var(--error-color-medium, red);
 }
 
-.pdk_dashboard-page__subscriptions__row__key {
+.pdk_dashboard-page__subscriptions__key {
     font-weight: 600;
 }
 
+.pdk_dashboard-page__subscriptions__traffic {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
 .pdk_dashboard-page__subscriptions__bar {
-    height: 10px;
+    height: 8px;
     width: 100%;
-    border-radius: 6px;
+    border-radius: 5px;
     background: var(--background-color-low, #e5e5e5);
     overflow: hidden;
 }
 
 .pdk_dashboard-page__subscriptions__bar-fill {
     height: 100%;
-    border-radius: 6px;
+    border-radius: 5px;
     transition: width 0.3s ease;
 }
 
@@ -243,6 +251,7 @@ export const styles = `
     padding: 1px 6px;
     font-size: 0.8em;
     font-weight: 600;
+    margin-left: 4px;
 }
 
 .pdk_dashboard-page__subscriptions__badge--yellow {
@@ -259,73 +268,13 @@ export const styles = `
     white-space: nowrap;
 }
 
+.pdk_dashboard-page__subscriptions__refresh--compact {
+    padding: 0 6px;
+    line-height: 1.6;
+}
+
 .pdk_dashboard-page__subscriptions__updated {
     margin-top: auto;
-}
-/* Real-time traffic graph */
-.pdk_dashboard-page__traffic-graph {
-    margin-top: 10px;
-    border: 2px var(--background-color-low, lightgray) solid;
-    border-radius: 4px;
-    padding: 10px;
-}
-
-.pdk_dashboard-page__traffic-graph__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.pdk_dashboard-page__traffic-graph__legend {
-    font-size: 0.85em;
-}
-
-.pdk_dashboard-page__traffic-graph__bars {
-    margin-top: 8px;
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
-    height: 64px;
-}
-
-.pdk_dashboard-page__traffic-graph__column {
-    flex: 1;
-    height: 100%;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 1px;
-}
-
-.pdk_dashboard-page__traffic-graph__bar {
-    width: 45%;
-    min-height: 1px;
-    border-radius: 2px 2px 0 0;
-    transition: height 0.2s ease;
-}
-
-.pdk_dashboard-page__traffic-graph__bar--down {
-    background: var(--success-color-medium, green);
-}
-
-.pdk_dashboard-page__traffic-graph__bar--up {
-    background: var(--primary-color-high, dodgerblue);
-}
-
-.pdk_dashboard-page__traffic-graph__empty {
-    padding: 18px 0;
-    text-align: center;
-}
-
-.pdk_dashboard-page__outbound-grid__item__speed {
-    margin-left: 8px;
-    padding: 1px 6px;
-    font-size: 0.8em;
-    line-height: 1.4;
-}
-
-`;
+}`;
 
 export default styles;

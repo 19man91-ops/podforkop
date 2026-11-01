@@ -4,22 +4,12 @@ import {
   preserveScrollForPage,
 } from '../../../helpers';
 import { prettyBytes } from '../../../helpers/prettyBytes';
+import { showToast } from '../../../helpers/showToast';
 import { CustomPodkopMethods, PodkopShellMethods } from '../../methods';
 import { logger, socket, store, StoreType } from '../../services';
-import {
-  renderSections,
-  renderSubscriptions,
-  renderTrafficGraph,
-  renderWidget,
-} from './partials';
+import { renderSections, renderSubscriptions, renderWidget } from './partials';
 import { fetchServicesInfo } from '../../fetchers';
 import { getClashApiSecret } from '../../methods/custom/getClashApiSecret';
-import { TrafficSample } from './trafficGraph';
-
-// Real-time traffic graph history (one sample per Clash API message)
-const trafficHistory: TrafficSample[] = [];
-const TRAFFIC_HISTORY_LIMIT = 40;
-
 // Manual per-node download speed test results
 const speedResults: Record<string, string> = {};
 let speedTestingTag = '';
@@ -140,14 +130,6 @@ async function connectToClashSockets() {
     (msg) => {
       const parsedMsg = JSON.parse(msg);
 
-      trafficHistory.push({
-        up: Number(parsedMsg.up) || 0,
-        down: Number(parsedMsg.down) || 0,
-      });
-      if (trafficHistory.length > TRAFFIC_HISTORY_LIMIT) {
-        trafficHistory.shift();
-      }
-
       store.set({
         bandwidthWidget: {
           loading: false,
@@ -256,10 +238,13 @@ async function handleTestSpeed(tag: string) {
   try {
     const response = await PodkopShellMethods.speedTest(tag);
     const result = response.success ? response.data : null;
-    speedResults[tag] =
-      result?.success && typeof result.mbps === 'number'
-        ? `${result.mbps} Mbps`
-        : 'N/A';
+    const succeeded = Boolean(
+      result?.success && typeof result.mbps === 'number',
+    );
+    speedResults[tag] = succeeded ? `${result?.mbps} Mbps` : 'N/A';
+    if (!succeeded) {
+      showToast(_('Speed test failed'), 'error');
+    }
   } catch (error) {
     logger.error('[DASHBOARD]', 'handleTestSpeed failed', error);
     speedResults[tag] = 'N/A';
@@ -361,16 +346,6 @@ async function renderSectionsWidget() {
   return preserveScrollForPage(() => {
     container!.replaceChildren(...renderedWidgets);
   });
-}
-
-async function renderTrafficGraphWidget() {
-  const container = document.getElementById('dashboard-widget-traffic-graph');
-
-  if (!container) {
-    return;
-  }
-
-  container.replaceChildren(renderTrafficGraph(trafficHistory));
 }
 
 async function renderSubscriptionsWidget() {
@@ -565,7 +540,6 @@ async function onStoreUpdate(
 
   if (diff.bandwidthWidget) {
     renderBandwidthWidget();
-    renderTrafficGraphWidget();
   }
 
   if (diff.trafficTotalWidget) {
@@ -608,7 +582,6 @@ function onPageUnmount() {
     'sectionsWidget',
     'subscriptionsWidget',
   ]);
-  trafficHistory.length = 0;
   Object.keys(speedResults).forEach((key) => delete speedResults[key]);
   speedTestingTag = '';
   socket.resetAll();

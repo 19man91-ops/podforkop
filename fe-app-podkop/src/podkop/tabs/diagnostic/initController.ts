@@ -41,6 +41,10 @@ async function fetchSystemInfo() {
         sing_box_version: _('unknown'),
         openwrt_version: _('unknown'),
         device_model: _('unknown'),
+        core_family: _('unknown'),
+        core_variant: _('unknown'),
+        core_package: _('unknown'),
+        core_package_version: _('unknown'),
       },
     });
   }
@@ -255,6 +259,16 @@ async function handlePrivacyTest() {
               ? _('MSS clamp enabled')
               : _('MSS clamp not found')
           })`,
+        ]),
+        E('div', { class: 'pdk_diagnostic-page__privacy-actions' }, [
+          E(
+            'button',
+            {
+              class: 'btn cbi-button',
+              click: () => ui.hideModal(),
+            },
+            _('Close'),
+          ),
         ]),
       ]),
     );
@@ -497,6 +511,14 @@ function renderDiagnosticSystemInfoWidget() {
       {
         key: 'Sing-box',
         value: diagnosticsSystemInfo.sing_box_version,
+      },
+      {
+        key: _('Core'),
+        value: `${diagnosticsSystemInfo.core_package || 'unknown'} (${diagnosticsSystemInfo.core_family || 'unknown'}, ${diagnosticsSystemInfo.core_variant || 'unknown'})`,
+      },
+      {
+        key: _('Core version'),
+        value: diagnosticsSystemInfo.core_package_version,
       },
       {
         key: 'OS',

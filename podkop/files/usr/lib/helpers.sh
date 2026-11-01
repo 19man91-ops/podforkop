@@ -58,6 +58,68 @@ section_is_enabled() {
     [ "$enabled" -eq 1 ]
 }
 
+# Returns the installed sing-box package name (forkop / podkop-engine / stock)
+sing_box_get_core_package_name() {
+    local package
+
+    for package in sing-box-forkop podkop-engine-full podkop-engine sing-box-tiny sing-box; do
+        if command -v apk >/dev/null 2>&1; then
+            apk info -e "$package" >/dev/null 2>&1 && {
+                echo "$package"
+                return 0
+            }
+        elif opkg list-installed 2>/dev/null | grep -q "^${package} "; then
+            echo "$package"
+            return 0
+        fi
+    done
+    echo "unknown"
+}
+
+sing_box_get_core_family() {
+    case "$(sing_box_get_core_package_name)" in
+    sing-box-forkop) echo "forkop" ;;
+    podkop-engine | podkop-engine-full) echo "podkop-engine" ;;
+    sing-box | sing-box-tiny) echo "sing-box" ;;
+    *) echo "unknown" ;;
+    esac
+}
+
+sing_box_get_core_variant() {
+    case "$(sing_box_get_core_package_name)" in
+    sing-box-forkop)
+        if [ -r /usr/share/sing-box-forkop/variant ]; then
+            cat /usr/share/sing-box-forkop/variant 2>/dev/null | tr -d '\r\n' || true
+        else
+            echo "unknown"
+        fi
+        ;;
+    podkop-engine-full) echo "full" ;;
+    podkop-engine) echo "slim" ;;
+    sing-box-tiny) echo "tiny" ;;
+    sing-box) echo "stock" ;;
+    *) echo "unknown" ;;
+    esac
+}
+
+sing_box_get_core_package_version() {
+    local package
+
+    package="$(sing_box_get_core_package_name)"
+    [ "$package" = "unknown" ] && {
+        echo "unknown"
+        return
+    }
+
+    if command -v apk >/dev/null 2>&1; then
+        apk list --installed 2>/dev/null | awk -v package="$package" '
+            index($1, package "-") == 1 { print $1; exit }
+        ' | sed "s/^${package}-//"
+    else
+        opkg list-installed 2>/dev/null | awk -v package="$package" '$1 == package { print $3; exit }'
+    fi
+}
+
 sing_box_uses_subscription_providers() {
     [ -r /usr/share/sing-box-forkop/variant ] && return 0
     [ -d /usr/share/sing-box-forkop ] && return 0

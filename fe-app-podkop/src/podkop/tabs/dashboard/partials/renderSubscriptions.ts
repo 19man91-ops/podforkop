@@ -25,7 +25,7 @@ function formatDate(date: Date): string {
 
 function renderSkeleton() {
   return E('div', { class: 'pdk_dashboard-page__subscriptions' }, [
-    E('div', { class: 'pdk_dashboard-page__subscriptions__title' }, [
+    E('div', { class: 'pdk_dashboard-page__subscriptions__header' }, [
       E('b', {}, _('Subscriptions')),
     ]),
     E('div', { class: 'pdk_dashboard-page__subscriptions__grid' }, [
@@ -40,20 +40,21 @@ function renderSkeleton() {
 function renderRefreshButton(
   refreshing: boolean,
   onRefresh: () => void,
-  extraClass = '',
+  compact = false,
 ) {
   return E(
     'button',
     {
-      class: `btn pdk_dashboard-page__subscriptions__refresh ${extraClass}`,
+      class: `btn cbi-button pdk_dashboard-page__subscriptions__refresh${compact ? ' pdk_dashboard-page__subscriptions__refresh--compact' : ''}`,
       disabled: refreshing ? true : undefined,
+      title: _('Refresh'),
       click: () => {
         if (!refreshing) {
           onRefresh();
         }
       },
     },
-    refreshing ? _('Refreshing...') : _('Refresh'),
+    refreshing ? '…' : compact ? '🔄' : _('Refresh'),
   );
 }
 
@@ -62,13 +63,19 @@ function renderTrafficBlock(info: Podkop.SubscriptionSectionInfo) {
 
   if (usage.unlimited) {
     return E('div', { class: 'pdk_dashboard-page__subscriptions__row' }, [
-      E('span', { class: 'pdk_dashboard-page__subscriptions__row__key' }, [
-        `${_('Traffic')}: `,
+      E('span', { class: 'pdk_dashboard-page__subscriptions__key' }, [
+        `${_('Used')}: `,
       ]),
       E('span', {}, [
-        usage.used > 0
-          ? `${prettyBytes(usage.used)} (${_('Unlimited traffic')})`
-          : _('Unlimited traffic'),
+        prettyBytes(usage.used),
+        E(
+          'span',
+          {
+            class:
+              'pdk_dashboard-page__subscriptions__muted pdk_dashboard-page__subscriptions__inline-muted',
+          },
+          ` · ${_('no traffic limit')}`,
+        ),
       ]),
     ]);
   }
@@ -81,21 +88,14 @@ function renderTrafficBlock(info: Podkop.SubscriptionSectionInfo) {
         : 'pdk_dashboard-page__subscriptions__bar-fill--green';
 
   return E('div', { class: 'pdk_dashboard-page__subscriptions__traffic' }, [
-    E(
-      'div',
-      {
-        class: 'pdk_dashboard-page__subscriptions__row',
-        title: `${_('Traffic')}: ${usage.percent}%`,
-      },
-      [
-        E('span', { class: 'pdk_dashboard-page__subscriptions__row__key' }, [
-          `${_('Traffic')}: `,
-        ]),
-        E('span', {}, [
-          `${prettyBytes(usage.used)} / ${prettyBytes(usage.total)}`,
-        ]),
-      ],
-    ),
+    E('div', { class: 'pdk_dashboard-page__subscriptions__row' }, [
+      E('span', { class: 'pdk_dashboard-page__subscriptions__key' }, [
+        `${_('Traffic')}: `,
+      ]),
+      E('span', {}, [
+        `${prettyBytes(usage.used)} / ${prettyBytes(usage.total)}`,
+      ]),
+    ]),
     E(
       'div',
       {
@@ -104,7 +104,6 @@ function renderTrafficBlock(info: Podkop.SubscriptionSectionInfo) {
         'aria-valuemin': '0',
         'aria-valuemax': '100',
         'aria-valuenow': String(usage.percent),
-        title: `${_('Remaining')}: ${prettyBytes(usage.remaining)}`,
       },
       [
         E('div', {
@@ -117,12 +116,10 @@ function renderTrafficBlock(info: Podkop.SubscriptionSectionInfo) {
       'div',
       {
         class:
-          'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted',
+          'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted',
       },
       [
-        E('span', {}, [
-          `${_('Remaining')}: ${prettyBytes(usage.remaining)} (${usage.percent}%)`,
-        ]),
+        `${_('Remaining')}: ${prettyBytes(usage.remaining)} (${usage.percent}%)`,
       ],
     ),
   ]);
@@ -136,20 +133,25 @@ function renderExpiryBlock(info: Podkop.SubscriptionSectionInfo) {
       'div',
       {
         class:
-          'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted',
+          'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted',
       },
-      [`${_('Valid until')}: ${_('not set')}`],
+      [`${_('Valid until')}: ${_('no limit')}`],
     );
   }
 
-  const children = [
-    E('span', { class: 'pdk_dashboard-page__subscriptions__row__key' }, [
+  const children: (HTMLElement | string)[] = [
+    E('span', { class: 'pdk_dashboard-page__subscriptions__key' }, [
       `${_('Valid until')}: `,
     ]),
-    E('span', {}, [`${formatDate(expiry.validUntil)}`]),
-    E('span', { class: 'pdk_dashboard-page__subscriptions__row--muted' }, [
-      ` (${_('Days left')}: ${Math.max(0, expiry.daysLeft ?? 0)})`,
-    ]),
+    E('span', {}, [formatDate(expiry.validUntil)]),
+    E(
+      'span',
+      {
+        class:
+          'pdk_dashboard-page__subscriptions__muted pdk_dashboard-page__subscriptions__inline-muted',
+      },
+      [` · ${_('Days left')}: ${Math.max(0, expiry.daysLeft ?? 0)}`],
+    ),
   ];
 
   if (expiry.level === 'expired') {
@@ -193,61 +195,80 @@ function renderCard(
   );
   const hasData = info.status !== 'no-data';
   const partial = info.status === 'partial';
+  const sourcesLabel = sources.length
+    ? sources.length > 1
+      ? `${sources[0]} +${sources.length - 1}`
+      : sources[0]
+    : _('unknown');
+
+  const children: HTMLElement[] = [
+    E('div', { class: 'pdk_dashboard-page__subscriptions__card-header' }, [
+      E(
+        'b',
+        {
+          class: 'pdk_dashboard-page__subscriptions__card-title',
+          title: info.section,
+        },
+        info.section,
+      ),
+      renderRefreshButton(refreshing, onRefresh, true),
+    ]),
+    E(
+      'div',
+      {
+        class:
+          'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted',
+      },
+      [`${_('Sources')}: ${sourcesLabel}`],
+    ),
+  ];
+
+  if (hasData) {
+    children.push(renderTrafficBlock(info));
+    children.push(renderExpiryBlock(info));
+  } else {
+    children.push(
+      E(
+        'div',
+        {
+          class:
+            'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted',
+        },
+        [_('No subscription data')],
+      ),
+    );
+  }
+
+  if (partial) {
+    children.push(
+      E(
+        'div',
+        {
+          class:
+            'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted',
+        },
+        [_('Some sources did not return subscription info')],
+      ),
+    );
+  }
+
+  children.push(
+    E(
+      'div',
+      {
+        class:
+          'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted pdk_dashboard-page__subscriptions__updated',
+      },
+      [`${_('Updated')}: ${formatUpdatedAgo(info.updated_at)}`],
+    ),
+  );
 
   return E(
     'div',
     {
       class: `pdk_dashboard-page__subscriptions__card${partial ? ' pdk_dashboard-page__subscriptions__card--warning' : ''}`,
     },
-    [
-      E('div', { class: 'pdk_dashboard-page__subscriptions__card-header' }, [
-        E('b', { class: 'pdk_dashboard-page__subscriptions__card-title' }, [
-          info.section,
-        ]),
-        renderRefreshButton(refreshing, onRefresh),
-      ]),
-      E(
-        'div',
-        {
-          class:
-            'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted',
-        },
-        [
-          `${_('Sources')}: ${sources.length ? sources.join(', ') : _('unknown')}${sources.length > 1 ? ` (+${sources.length - 1})` : ''}`,
-        ],
-      ),
-      hasData
-        ? renderTrafficBlock(info)
-        : E(
-            'div',
-            {
-              class:
-                'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted',
-            },
-            [_('No subscription data')],
-          ),
-      hasData
-        ? renderExpiryBlock(info)
-        : E('div', { class: 'pdk_dashboard-page__subscriptions__card-spacer' }),
-      partial
-        ? E(
-            'div',
-            {
-              class:
-                'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted',
-            },
-            [_('Some sources did not return subscription info')],
-          )
-        : null,
-      E(
-        'div',
-        {
-          class:
-            'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted pdk_dashboard-page__subscriptions__updated',
-        },
-        [`${_('Updated')}: ${formatUpdatedAgo(info.updated_at)}`],
-      ),
-    ],
+    children,
   );
 }
 
@@ -265,14 +286,14 @@ export function renderSubscriptions({
 
   const header = E(
     'div',
-    { class: 'pdk_dashboard-page__subscriptions__title' },
+    { class: 'pdk_dashboard-page__subscriptions__header' },
     [
       E('b', {}, _('Subscriptions')),
       E(
         'span',
         {
           class:
-            'pdk_dashboard-page__subscriptions__title-updated pdk_dashboard-page__subscriptions__row--muted',
+            'pdk_dashboard-page__subscriptions__muted pdk_dashboard-page__subscriptions__header-updated',
         },
         [`${_('Updated')}: ${formatUpdatedAgo(updatedAt)}`],
       ),
@@ -301,7 +322,7 @@ export function renderSubscriptions({
         'div',
         {
           class:
-            'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted',
+            'pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted',
         },
         [_('No subscriptions configured in any section')],
       ),

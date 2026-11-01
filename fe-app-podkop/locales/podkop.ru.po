@@ -1210,3 +1210,22 @@ msgstr "недоступно"
 msgid "WAN"
 msgstr "WAN"
 
+
+msgid "Core"
+msgstr "Ядро"
+
+msgid "Core version"
+msgstr "Версия ядра"
+
+msgid "no limit"
+msgstr "не ограничен"
+
+msgid "no traffic limit"
+msgstr "лимит не задан"
+
+msgid "Speed test failed"
+msgstr "Тест скорости не удался"
+
+msgid "Used"
+msgstr "Использовано"
+

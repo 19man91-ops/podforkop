@@ -187,4 +187,25 @@ export const styles = `
     width: 16px;
     height: 16px;
 }
-`;
+
+.pdk_diagnostic-page__privacy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 60vh;
+    overflow: auto;
+}
+
+.pdk_diagnostic-page__privacy h4 {
+    margin: 8px 0 2px;
+}
+
+.pdk_diagnostic-page__privacy p {
+    margin: 0;
+}
+
+.pdk_diagnostic-page__privacy-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}`;

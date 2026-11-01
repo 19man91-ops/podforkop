@@ -87,8 +87,7 @@ export function renderDefaultState({
                   {
                     class: 'btn pdk_dashboard-page__outbound-grid__item__speed',
                     title: _('Download speed test'),
-                    onclick: (event: MouseEvent) => {
-                      event.stopPropagation();
+                    click: () => {
                       onTestSpeed(outbound.code);
                     },
                   },

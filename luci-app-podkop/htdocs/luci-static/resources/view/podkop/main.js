@@ -1487,7 +1487,11 @@ var initialDiagnosticStore = {
     luci_app_version: "loading",
     sing_box_version: "loading",
     openwrt_version: "loading",
-    device_model: "loading"
+    device_model: "loading",
+    core_family: "loading",
+    core_variant: "loading",
+    core_package: "loading",
+    core_package_version: "loading"
   },
   diagnosticsActions: {
     restart: {
@@ -2583,8 +2587,7 @@ function renderDefaultState({
               {
                 class: "btn pdk_dashboard-page__outbound-grid__item__speed",
                 title: _("Download speed test"),
-                onclick: (event) => {
-                  event.stopPropagation();
+                click: () => {
                   onTestSpeed(outbound.code);
                 }
               },
@@ -2723,7 +2726,7 @@ function formatDate(date) {
 }
 function renderSkeleton() {
   return E("div", { class: "pdk_dashboard-page__subscriptions" }, [
-    E("div", { class: "pdk_dashboard-page__subscriptions__title" }, [
+    E("div", { class: "pdk_dashboard-page__subscriptions__header" }, [
       E("b", {}, _("Subscriptions"))
     ]),
     E("div", { class: "pdk_dashboard-page__subscriptions__grid" }, [
@@ -2733,50 +2736,51 @@ function renderSkeleton() {
     ])
   ]);
 }
-function renderRefreshButton(refreshing, onRefresh, extraClass = "") {
+function renderRefreshButton(refreshing, onRefresh, compact = false) {
   return E(
     "button",
     {
-      class: `btn pdk_dashboard-page__subscriptions__refresh ${extraClass}`,
+      class: `btn cbi-button pdk_dashboard-page__subscriptions__refresh${compact ? " pdk_dashboard-page__subscriptions__refresh--compact" : ""}`,
       disabled: refreshing ? true : void 0,
+      title: _("Refresh"),
       click: () => {
         if (!refreshing) {
           onRefresh();
         }
       }
     },
-    refreshing ? _("Refreshing...") : _("Refresh")
+    refreshing ? "\u2026" : compact ? "\u{1F504}" : _("Refresh")
   );
 }
 function renderTrafficBlock(info) {
   const usage = getTrafficUsage(info.upload, info.download, info.total);
   if (usage.unlimited) {
     return E("div", { class: "pdk_dashboard-page__subscriptions__row" }, [
-      E("span", { class: "pdk_dashboard-page__subscriptions__row__key" }, [
-        `${_("Traffic")}: `
+      E("span", { class: "pdk_dashboard-page__subscriptions__key" }, [
+        `${_("Used")}: `
       ]),
       E("span", {}, [
-        usage.used > 0 ? `${prettyBytes(usage.used)} (${_("Unlimited traffic")})` : _("Unlimited traffic")
+        prettyBytes(usage.used),
+        E(
+          "span",
+          {
+            class: "pdk_dashboard-page__subscriptions__muted pdk_dashboard-page__subscriptions__inline-muted"
+          },
+          ` \xB7 ${_("no traffic limit")}`
+        )
       ])
     ]);
   }
   const levelClass = usage.level === "critical" ? "pdk_dashboard-page__subscriptions__bar-fill--red" : usage.level === "warning" ? "pdk_dashboard-page__subscriptions__bar-fill--yellow" : "pdk_dashboard-page__subscriptions__bar-fill--green";
   return E("div", { class: "pdk_dashboard-page__subscriptions__traffic" }, [
-    E(
-      "div",
-      {
-        class: "pdk_dashboard-page__subscriptions__row",
-        title: `${_("Traffic")}: ${usage.percent}%`
-      },
-      [
-        E("span", { class: "pdk_dashboard-page__subscriptions__row__key" }, [
-          `${_("Traffic")}: `
-        ]),
-        E("span", {}, [
-          `${prettyBytes(usage.used)} / ${prettyBytes(usage.total)}`
-        ])
-      ]
-    ),
+    E("div", { class: "pdk_dashboard-page__subscriptions__row" }, [
+      E("span", { class: "pdk_dashboard-page__subscriptions__key" }, [
+        `${_("Traffic")}: `
+      ]),
+      E("span", {}, [
+        `${prettyBytes(usage.used)} / ${prettyBytes(usage.total)}`
+      ])
+    ]),
     E(
       "div",
       {
@@ -2784,8 +2788,7 @@ function renderTrafficBlock(info) {
         role: "progressbar",
         "aria-valuemin": "0",
         "aria-valuemax": "100",
-        "aria-valuenow": String(usage.percent),
-        title: `${_("Remaining")}: ${prettyBytes(usage.remaining)}`
+        "aria-valuenow": String(usage.percent)
       },
       [
         E("div", {
@@ -2797,12 +2800,10 @@ function renderTrafficBlock(info) {
     E(
       "div",
       {
-        class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
+        class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted"
       },
       [
-        E("span", {}, [
-          `${_("Remaining")}: ${prettyBytes(usage.remaining)} (${usage.percent}%)`
-        ])
+        `${_("Remaining")}: ${prettyBytes(usage.remaining)} (${usage.percent}%)`
       ]
     )
   ]);
@@ -2813,19 +2814,23 @@ function renderExpiryBlock(info) {
     return E(
       "div",
       {
-        class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
+        class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted"
       },
-      [`${_("Valid until")}: ${_("not set")}`]
+      [`${_("Valid until")}: ${_("no limit")}`]
     );
   }
   const children = [
-    E("span", { class: "pdk_dashboard-page__subscriptions__row__key" }, [
+    E("span", { class: "pdk_dashboard-page__subscriptions__key" }, [
       `${_("Valid until")}: `
     ]),
-    E("span", {}, [`${formatDate(expiry.validUntil)}`]),
-    E("span", { class: "pdk_dashboard-page__subscriptions__row--muted" }, [
-      ` (${_("Days left")}: ${Math.max(0, expiry.daysLeft ?? 0)})`
-    ])
+    E("span", {}, [formatDate(expiry.validUntil)]),
+    E(
+      "span",
+      {
+        class: "pdk_dashboard-page__subscriptions__muted pdk_dashboard-page__subscriptions__inline-muted"
+      },
+      [` \xB7 ${_("Days left")}: ${Math.max(0, expiry.daysLeft ?? 0)}`]
+    )
   ];
   if (expiry.level === "expired") {
     children.push(
@@ -2860,50 +2865,67 @@ function renderCard(info, refreshing, onRefresh) {
   );
   const hasData = info.status !== "no-data";
   const partial = info.status === "partial";
+  const sourcesLabel = sources.length ? sources.length > 1 ? `${sources[0]} +${sources.length - 1}` : sources[0] : _("unknown");
+  const children = [
+    E("div", { class: "pdk_dashboard-page__subscriptions__card-header" }, [
+      E(
+        "b",
+        {
+          class: "pdk_dashboard-page__subscriptions__card-title",
+          title: info.section
+        },
+        info.section
+      ),
+      renderRefreshButton(refreshing, onRefresh, true)
+    ]),
+    E(
+      "div",
+      {
+        class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted"
+      },
+      [`${_("Sources")}: ${sourcesLabel}`]
+    )
+  ];
+  if (hasData) {
+    children.push(renderTrafficBlock(info));
+    children.push(renderExpiryBlock(info));
+  } else {
+    children.push(
+      E(
+        "div",
+        {
+          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted"
+        },
+        [_("No subscription data")]
+      )
+    );
+  }
+  if (partial) {
+    children.push(
+      E(
+        "div",
+        {
+          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted"
+        },
+        [_("Some sources did not return subscription info")]
+      )
+    );
+  }
+  children.push(
+    E(
+      "div",
+      {
+        class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted pdk_dashboard-page__subscriptions__updated"
+      },
+      [`${_("Updated")}: ${formatUpdatedAgo(info.updated_at)}`]
+    )
+  );
   return E(
     "div",
     {
       class: `pdk_dashboard-page__subscriptions__card${partial ? " pdk_dashboard-page__subscriptions__card--warning" : ""}`
     },
-    [
-      E("div", { class: "pdk_dashboard-page__subscriptions__card-header" }, [
-        E("b", { class: "pdk_dashboard-page__subscriptions__card-title" }, [
-          info.section
-        ]),
-        renderRefreshButton(refreshing, onRefresh)
-      ]),
-      E(
-        "div",
-        {
-          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
-        },
-        [
-          `${_("Sources")}: ${sources.length ? sources.join(", ") : _("unknown")}${sources.length > 1 ? ` (+${sources.length - 1})` : ""}`
-        ]
-      ),
-      hasData ? renderTrafficBlock(info) : E(
-        "div",
-        {
-          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
-        },
-        [_("No subscription data")]
-      ),
-      hasData ? renderExpiryBlock(info) : E("div", { class: "pdk_dashboard-page__subscriptions__card-spacer" }),
-      partial ? E(
-        "div",
-        {
-          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
-        },
-        [_("Some sources did not return subscription info")]
-      ) : null,
-      E(
-        "div",
-        {
-          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted pdk_dashboard-page__subscriptions__updated"
-        },
-        [`${_("Updated")}: ${formatUpdatedAgo(info.updated_at)}`]
-      )
-    ]
+    children
   );
 }
 function renderSubscriptions({
@@ -2919,13 +2941,13 @@ function renderSubscriptions({
   }
   const header = E(
     "div",
-    { class: "pdk_dashboard-page__subscriptions__title" },
+    { class: "pdk_dashboard-page__subscriptions__header" },
     [
       E("b", {}, _("Subscriptions")),
       E(
         "span",
         {
-          class: "pdk_dashboard-page__subscriptions__title-updated pdk_dashboard-page__subscriptions__row--muted"
+          class: "pdk_dashboard-page__subscriptions__muted pdk_dashboard-page__subscriptions__header-updated"
         },
         [`${_("Updated")}: ${formatUpdatedAgo(updatedAt)}`]
       ),
@@ -2950,7 +2972,7 @@ function renderSubscriptions({
       E(
         "div",
         {
-          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
+          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__muted"
         },
         [_("No subscriptions configured in any section")]
       )
@@ -2962,69 +2984,6 @@ function renderSubscriptions({
       "div",
       { class: "pdk_dashboard-page__subscriptions__grid" },
       data.map((info) => renderCard(info, refreshing, onRefresh))
-    )
-  ]);
-}
-
-// src/podkop/tabs/dashboard/trafficGraph.ts
-var TRAFFIC_GRAPH_MAX_BARS = 40;
-function toNonNegative(value) {
-  return Number.isFinite(value) && value > 0 ? value : 0;
-}
-function buildTrafficBars(history, maxBars = TRAFFIC_GRAPH_MAX_BARS) {
-  const slice = history.slice(-maxBars);
-  if (slice.length === 0) {
-    return [];
-  }
-  let max = 1;
-  slice.forEach((sample) => {
-    max = Math.max(max, toNonNegative(sample.up), toNonNegative(sample.down));
-  });
-  return slice.map((sample) => ({
-    upPercent: Math.round(toNonNegative(sample.up) / max * 100),
-    downPercent: Math.round(toNonNegative(sample.down) / max * 100)
-  }));
-}
-
-// src/podkop/tabs/dashboard/partials/renderTrafficGraph.ts
-function renderBars(history) {
-  const bars = buildTrafficBars(history, TRAFFIC_GRAPH_MAX_BARS);
-  return E(
-    "div",
-    { class: "pdk_dashboard-page__traffic-graph__bars" },
-    bars.map(
-      (bar) => E("div", { class: "pdk_dashboard-page__traffic-graph__column" }, [
-        E("span", {
-          class: "pdk_dashboard-page__traffic-graph__bar pdk_dashboard-page__traffic-graph__bar--down",
-          style: `height: ${bar.downPercent}%`
-        }),
-        E("span", {
-          class: "pdk_dashboard-page__traffic-graph__bar pdk_dashboard-page__traffic-graph__bar--up",
-          style: `height: ${bar.upPercent}%`
-        })
-      ])
-    )
-  );
-}
-function renderTrafficGraph(history) {
-  const last = history[history.length - 1];
-  return E("div", { class: "pdk_dashboard-page__traffic-graph" }, [
-    E("div", { class: "pdk_dashboard-page__traffic-graph__header" }, [
-      E("b", {}, _("Traffic graph")),
-      last ? E(
-        "span",
-        {
-          class: "pdk_dashboard-page__traffic-graph__legend pdk_dashboard-page__subscriptions__row--muted"
-        },
-        `\u2193 ${prettyBytes(last.down)}/s \xB7 \u2191 ${prettyBytes(last.up)}/s`
-      ) : null
-    ]),
-    history.length ? renderBars(history) : E(
-      "div",
-      {
-        class: "pdk_dashboard-page__traffic-graph__empty pdk_dashboard-page__subscriptions__row--muted"
-      },
-      _("Waiting for traffic data...")
     )
   ]);
 }
@@ -3123,12 +3082,6 @@ function render() {
           renderWidget({ loading: true, failed: false, title: "", items: [] })
         )
       ]),
-      // Real-time traffic graph
-      E(
-        "div",
-        { id: "dashboard-widget-traffic-graph" },
-        renderTrafficGraph([])
-      ),
       // Subscription traffic/expiry cards
       E(
         "div",
@@ -3167,6 +3120,25 @@ function render() {
   );
 }
 
+// src/helpers/showToast.ts
+function showToast(message, type, duration = 3e3) {
+  let container = document.querySelector(".toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => toast.classList.add("visible"), 100);
+  setTimeout(() => {
+    toast.classList.remove("visible");
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
 // src/podkop/fetchers/fetchServicesInfo.ts
 async function fetchServicesInfo() {
   const [podkop, singbox] = await Promise.all([
@@ -3194,8 +3166,6 @@ async function fetchServicesInfo() {
 }
 
 // src/podkop/tabs/dashboard/initController.ts
-var trafficHistory = [];
-var TRAFFIC_HISTORY_LIMIT = 40;
 var speedResults = {};
 var speedTestingTag = "";
 var SUBSCRIPTIONS_STALE_SECONDS = 30 * 60;
@@ -3283,13 +3253,6 @@ async function connectToClashSockets() {
     `${getClashWsUrl()}/traffic?token=${clashApiSecret}`,
     (msg) => {
       const parsedMsg = JSON.parse(msg);
-      trafficHistory.push({
-        up: Number(parsedMsg.up) || 0,
-        down: Number(parsedMsg.down) || 0
-      });
-      if (trafficHistory.length > TRAFFIC_HISTORY_LIMIT) {
-        trafficHistory.shift();
-      }
       store.set({
         bandwidthWidget: {
           loading: false,
@@ -3388,7 +3351,13 @@ async function handleTestSpeed(tag) {
   try {
     const response = await PodkopShellMethods.speedTest(tag);
     const result = response.success ? response.data : null;
-    speedResults[tag] = result?.success && typeof result.mbps === "number" ? `${result.mbps} Mbps` : "N/A";
+    const succeeded = Boolean(
+      result?.success && typeof result.mbps === "number"
+    );
+    speedResults[tag] = succeeded ? `${result?.mbps} Mbps` : "N/A";
+    if (!succeeded) {
+      showToast(_("Speed test failed"), "error");
+    }
   } catch (error) {
     logger.error("[DASHBOARD]", "handleTestSpeed failed", error);
     speedResults[tag] = "N/A";
@@ -3477,13 +3446,6 @@ async function renderSectionsWidget() {
   return preserveScrollForPage(() => {
     container.replaceChildren(...renderedWidgets);
   });
-}
-async function renderTrafficGraphWidget() {
-  const container = document.getElementById("dashboard-widget-traffic-graph");
-  if (!container) {
-    return;
-  }
-  container.replaceChildren(renderTrafficGraph(trafficHistory));
 }
 async function renderSubscriptionsWidget() {
   logger.debug("[DASHBOARD]", "renderSubscriptionsWidget");
@@ -3635,7 +3597,6 @@ async function onStoreUpdate(next, prev, diff) {
   }
   if (diff.bandwidthWidget) {
     renderBandwidthWidget();
-    renderTrafficGraphWidget();
   }
   if (diff.trafficTotalWidget) {
     renderTrafficTotalWidget();
@@ -3666,7 +3627,6 @@ function onPageUnmount() {
     "sectionsWidget",
     "subscriptionsWidget"
   ]);
-  trafficHistory.length = 0;
   Object.keys(speedResults).forEach((key) => delete speedResults[key]);
   speedTestingTag = "";
   socket.resetAll();
@@ -3848,31 +3808,33 @@ var styles = `
     margin-top: 10px;
 }
 
-.pdk_dashboard-page__subscriptions__title {
+.pdk_dashboard-page__subscriptions__header {
     display: flex;
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
 }
 
-.pdk_dashboard-page__subscriptions__title-updated {
+.pdk_dashboard-page__subscriptions__header-updated {
+    margin-left: auto;
     font-size: 0.85em;
 }
 
 .pdk_dashboard-page__subscriptions__grid {
     margin-top: 8px;
-    display: grid;
-    grid-template-columns: repeat(var(--dashboard-grid-columns), 1fr);
-    grid-gap: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .pdk_dashboard-page__subscriptions__card {
+    width: min(320px, 100%);
     border: 2px var(--background-color-low, lightgray) solid;
     border-radius: 4px;
     padding: 10px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
 }
 
 .pdk_dashboard-page__subscriptions__card--warning {
@@ -3880,7 +3842,7 @@ var styles = `
 }
 
 .pdk_dashboard-page__subscriptions__card--skeleton {
-    height: 160px;
+    height: 140px;
 }
 
 .pdk_dashboard-page__subscriptions__card-header {
@@ -3896,42 +3858,48 @@ var styles = `
     white-space: nowrap;
 }
 
-.pdk_dashboard-page__subscriptions__card-spacer {
-    min-height: 12px;
-}
-
 .pdk_dashboard-page__subscriptions__row {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 4px;
-    line-height: 1.5;
+    line-height: 1.45;
 }
 
-.pdk_dashboard-page__subscriptions__row--muted {
+.pdk_dashboard-page__subscriptions__muted {
     color: var(--text-color-low, gray);
     font-size: 0.9em;
+}
+
+.pdk_dashboard-page__subscriptions__inline-muted {
+    font-size: 1em;
 }
 
 .pdk_dashboard-page__subscriptions__row--error {
     color: var(--error-color-medium, red);
 }
 
-.pdk_dashboard-page__subscriptions__row__key {
+.pdk_dashboard-page__subscriptions__key {
     font-weight: 600;
 }
 
+.pdk_dashboard-page__subscriptions__traffic {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
 .pdk_dashboard-page__subscriptions__bar {
-    height: 10px;
+    height: 8px;
     width: 100%;
-    border-radius: 6px;
+    border-radius: 5px;
     background: var(--background-color-low, #e5e5e5);
     overflow: hidden;
 }
 
 .pdk_dashboard-page__subscriptions__bar-fill {
     height: 100%;
-    border-radius: 6px;
+    border-radius: 5px;
     transition: width 0.3s ease;
 }
 
@@ -3952,6 +3920,7 @@ var styles = `
     padding: 1px 6px;
     font-size: 0.8em;
     font-weight: 600;
+    margin-left: 4px;
 }
 
 .pdk_dashboard-page__subscriptions__badge--yellow {
@@ -3968,74 +3937,14 @@ var styles = `
     white-space: nowrap;
 }
 
+.pdk_dashboard-page__subscriptions__refresh--compact {
+    padding: 0 6px;
+    line-height: 1.6;
+}
+
 .pdk_dashboard-page__subscriptions__updated {
     margin-top: auto;
-}
-/* Real-time traffic graph */
-.pdk_dashboard-page__traffic-graph {
-    margin-top: 10px;
-    border: 2px var(--background-color-low, lightgray) solid;
-    border-radius: 4px;
-    padding: 10px;
-}
-
-.pdk_dashboard-page__traffic-graph__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.pdk_dashboard-page__traffic-graph__legend {
-    font-size: 0.85em;
-}
-
-.pdk_dashboard-page__traffic-graph__bars {
-    margin-top: 8px;
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
-    height: 64px;
-}
-
-.pdk_dashboard-page__traffic-graph__column {
-    flex: 1;
-    height: 100%;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 1px;
-}
-
-.pdk_dashboard-page__traffic-graph__bar {
-    width: 45%;
-    min-height: 1px;
-    border-radius: 2px 2px 0 0;
-    transition: height 0.2s ease;
-}
-
-.pdk_dashboard-page__traffic-graph__bar--down {
-    background: var(--success-color-medium, green);
-}
-
-.pdk_dashboard-page__traffic-graph__bar--up {
-    background: var(--primary-color-high, dodgerblue);
-}
-
-.pdk_dashboard-page__traffic-graph__empty {
-    padding: 18px 0;
-    text-align: center;
-}
-
-.pdk_dashboard-page__outbound-grid__item__speed {
-    margin-left: 8px;
-    padding: 1px 6px;
-    font-size: 0.8em;
-    line-height: 1.4;
-}
-
-`;
+}`;
 
 // src/podkop/tabs/dashboard/index.ts
 var DashboardTab = {
@@ -5016,25 +4925,6 @@ function renderButton({
   );
 }
 
-// src/helpers/showToast.ts
-function showToast(message, type, duration = 3e3) {
-  let container = document.querySelector(".toast-container");
-  if (!container) {
-    container = document.createElement("div");
-    container.className = "toast-container";
-    document.body.appendChild(container);
-  }
-  const toast = document.createElement("div");
-  toast.className = `toast toast-${type}`;
-  toast.textContent = message;
-  container.appendChild(toast);
-  setTimeout(() => toast.classList.add("visible"), 100);
-  setTimeout(() => {
-    toast.classList.remove("visible");
-    setTimeout(() => toast.remove(), 300);
-  }, duration);
-}
-
 // src/helpers/copyToClipboard.ts
 function copyToClipboard(text2) {
   const textarea = document.createElement("textarea");
@@ -5598,7 +5488,11 @@ async function fetchSystemInfo() {
         luci_app_version: _("unknown"),
         sing_box_version: _("unknown"),
         openwrt_version: _("unknown"),
-        device_model: _("unknown")
+        device_model: _("unknown"),
+        core_family: _("unknown"),
+        core_variant: _("unknown"),
+        core_package: _("unknown"),
+        core_package_version: _("unknown")
       }
     });
   }
@@ -5779,6 +5673,16 @@ async function handlePrivacyTest() {
         ]),
         E("p", {}, [
           `${_("Max ping payload")}: ${data.mtu.max_ping_payload}; ${_("Recommended MSS")}: ${data.mtu.recommended_mss} (${data.mtu.mss_clamp_enabled ? _("MSS clamp enabled") : _("MSS clamp not found")})`
+        ]),
+        E("div", { class: "pdk_diagnostic-page__privacy-actions" }, [
+          E(
+            "button",
+            {
+              class: "btn cbi-button",
+              click: () => ui.hideModal()
+            },
+            _("Close")
+          )
         ])
       ])
     );
@@ -5993,6 +5897,14 @@ function renderDiagnosticSystemInfoWidget() {
       {
         key: "Sing-box",
         value: diagnosticsSystemInfo.sing_box_version
+      },
+      {
+        key: _("Core"),
+        value: `${diagnosticsSystemInfo.core_package || "unknown"} (${diagnosticsSystemInfo.core_family || "unknown"}, ${diagnosticsSystemInfo.core_variant || "unknown"})`
+      },
+      {
+        key: _("Core version"),
+        value: diagnosticsSystemInfo.core_package_version
       },
       {
         key: "OS",
@@ -6285,7 +6197,28 @@ var styles4 = `
     width: 16px;
     height: 16px;
 }
-`;
+
+.pdk_diagnostic-page__privacy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 60vh;
+    overflow: auto;
+}
+
+.pdk_diagnostic-page__privacy h4 {
+    margin: 8px 0 2px;
+}
+
+.pdk_diagnostic-page__privacy p {
+    margin: 0;
+}
+
+.pdk_diagnostic-page__privacy-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}`;
 
 // src/podkop/tabs/diagnostic/index.ts
 var DiagnosticTab = {

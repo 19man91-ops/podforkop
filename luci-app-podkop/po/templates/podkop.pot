@@ -1549,3 +1549,22 @@ msgstr ""
 msgid "WAN"
 msgstr ""
 
+
+msgid "Core"
+msgstr ""
+
+msgid "Core version"
+msgstr ""
+
+msgid "no limit"
+msgstr ""
+
+msgid "no traffic limit"
+msgstr ""
+
+msgid "Speed test failed"
+msgstr ""
+
+msgid "Used"
+msgstr ""
+

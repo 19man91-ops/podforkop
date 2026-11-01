@@ -13,6 +13,10 @@ function makeDiagnosticsSystemInfo(
     sing_box_version: '1.11.0',
     openwrt_version: 'OpenWrt 25.12',
     device_model: 'Test Router',
+    core_family: 'forkop',
+    core_variant: 'base',
+    core_package: 'sing-box-forkop',
+    core_package_version: '1.14.4-r1',
     ...patch,
   };
 }
