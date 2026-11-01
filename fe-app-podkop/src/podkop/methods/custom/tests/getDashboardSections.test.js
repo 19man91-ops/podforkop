@@ -10,6 +10,8 @@ vi.mock('../../../../helpers', async () => ({
     .getProxyUrlName,
   splitProxyString: (await import('../../../../helpers/splitProxyString'))
     .splitProxyString,
+  formatProxyDisplayName: (await import('../../../../helpers/countryFlags'))
+    .formatProxyDisplayName,
 }));
 vi.mock('../../shell', () => ({
   PodkopShellMethods: { getClashApiProxies: vi.fn() },
@@ -119,8 +121,8 @@ describe('getDashboardSections, urltest section', () => {
     expect(result.data).toHaveLength(1);
     expect(result.data[0].withTagSelect).toBe(true);
     expect(result.data[0].outbounds.map((o) => o.displayName)).toEqual([
-      'FI-ruspace',
-      'FI-ruspace-Yulya-FI',
+      '🇫🇮 FI-ruspace',
+      '🇫🇮 FI-ruspace-Yulya-FI',
     ]);
     expect(result.data[0].outbounds[0].selected).toBe(true);
     expect(result.data[0].outbounds[1].selected).toBe(false);

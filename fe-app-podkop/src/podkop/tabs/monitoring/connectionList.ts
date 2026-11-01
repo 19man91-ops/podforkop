@@ -53,7 +53,7 @@ function renderList(
         },
         [
           renderHeading('host', _('Host')),
-          renderHeading('source', _('Source')),
+          renderHeading('source', _('Source / Device')),
           renderHeading('route', _('Route')),
           renderHeading('network', _('Type')),
           renderSortHeading('time', _('Time'), sort),
@@ -134,27 +134,44 @@ function renderValue(text: string, className?: string, fullValue = text) {
   );
 }
 
-function renderSource(item: ConnectionListItem) {
-  const label = sourceLabel(item.sourceName, item.sourceDetail);
-
-  if (item.system) {
+function renderSource({
+  sourceName: name,
+  sourceDetail: detail,
+  system,
+}: ConnectionListItem) {
+  if (system) {
     return renderValue(
-      item.sourceName,
+      name,
       'fkp_monitoring-page__value fkp_monitoring-page__tag fkp_monitoring-page__tag--builtin',
-      label,
+      _('The router itself: its services and programs'),
     );
   }
 
-  const detail =
-    item.sourceDetail &&
-    E('span', { class: 'fkp_monitoring-page__muted' }, item.sourceDetail);
+  const shown = name ? `${name} (${detail})` : detail || '-';
+  const label = sourceLabel(name, detail) || shown;
+  const muted = (text: string) =>
+    E('span', { class: 'fkp_monitoring-page__muted' }, text);
 
-  return renderValue(
-    [item.sourceName, detail ? ' ' : '', detail].filter(
-      Boolean,
-    ) as unknown as string,
-    'fkp_monitoring-page__value',
-    label,
+  return E(
+    'span',
+    {
+      class: 'fkp_monitoring-page__value',
+      title: label,
+      'data-copy-value': shown,
+    },
+    name
+      ? [
+          E(
+            'span',
+            {
+              class: 'fkp_monitoring-page__source-name',
+              style: 'font-weight: 500;',
+            },
+            name,
+          ),
+          ...(detail ? [' ', muted(`(${detail})`)] : []),
+        ]
+      : [muted(shown)],
   );
 }
 

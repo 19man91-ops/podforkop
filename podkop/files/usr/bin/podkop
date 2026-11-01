@@ -907,18 +907,87 @@ sing_box_configure_dns() {
     config=$(sing_box_cm_configure_dns "$config" "$SB_DNS_SERVER_TAG" "ipv4_only" true)
 
     log "Adding DNS Servers" "debug"
-    local dns_type dns_server bootstrap_dns_server dns_domain_resolver dns_server_address
+    local dns_type
     config_get dns_type "settings" "dns_type" "doh"
-    config_get dns_server "settings" "dns_server" "1.1.1.1"
-    config_get bootstrap_dns_server "settings" "bootstrap_dns_server" "77.88.8.8"
 
-    dns_server_address="$(url_get_host "$dns_server")"
-    if ! is_ipv4 "$dns_server_address"; then
-        dns_domain_resolver=$SB_BOOTSTRAP_SERVER_TAG
+    # Collect bootstrap DNS servers (support dynamic list or single value)
+    local bootstrap_servers=""
+    _cb_bs() { [ -n "$1" ] && bootstrap_servers="${bootstrap_servers:+$bootstrap_servers }$1"; }
+    config_list_foreach "settings" "bootstrap_dns_server" _cb_bs
+    if [ -z "$bootstrap_servers" ]; then
+        local single_bs
+        config_get single_bs "settings" "bootstrap_dns_server" "77.88.8.8"
+        bootstrap_servers="$single_bs"
     fi
 
-    config=$(sing_box_cm_add_udp_dns_server "$config" "$SB_BOOTSTRAP_SERVER_TAG" "$bootstrap_dns_server" 53)
-    config=$(sing_box_cf_add_dns_server "$config" "$dns_type" "$SB_DNS_SERVER_TAG" "$dns_server" "$dns_domain_resolver")
+    local bootstrap_strategy
+    config_get bootstrap_strategy "settings" "dns_bootstrap_fallback_strategy" "sequential"
+
+    # Configure bootstrap DNS in sing-box
+    local bs_count=0
+    for s in $bootstrap_servers; do
+        bs_count=$((bs_count + 1))
+    done
+
+    if [ "$bs_count" -le 1 ]; then
+        local s="${bootstrap_servers:-77.88.8.8}"
+        config=$(sing_box_cm_add_udp_dns_server "$config" "$SB_BOOTSTRAP_SERVER_TAG" "$s" 53)
+    else
+        local idx=1
+        local bs_tags=""
+        for s in $bootstrap_servers; do
+            local tag="${SB_BOOTSTRAP_SERVER_TAG}-${idx}"
+            config=$(sing_box_cm_add_udp_dns_server "$config" "$tag" "$s" 53)
+            bs_tags="${bs_tags:+$bs_tags }$tag"
+            idx=$((idx + 1))
+        done
+        config=$(sing_box_cm_add_fallback_dns_server "$config" "$SB_BOOTSTRAP_SERVER_TAG" "$bootstrap_strategy" $bs_tags)
+    fi
+
+    # Collect main DNS servers (support dynamic list or single value)
+    local main_servers=""
+    _cb_ms() { [ -n "$1" ] && main_servers="${main_servers:+$main_servers }$1"; }
+    config_list_foreach "settings" "dns_server" _cb_ms
+    if [ -z "$main_servers" ]; then
+        local single_ms
+        config_get single_ms "settings" "dns_server" "77.88.8.8"
+        main_servers="$single_ms"
+    fi
+
+    local main_strategy
+    config_get main_strategy "settings" "dns_main_fallback_strategy" "sequential"
+
+    # Configure main DNS in sing-box
+    local ms_count=0
+    for s in $main_servers; do
+        ms_count=$((ms_count + 1))
+    done
+
+    if [ "$ms_count" -le 1 ]; then
+        local s="${main_servers:-77.88.8.8}"
+        local s_host="$(url_get_host "$s")"
+        local resolver=""
+        if ! is_ipv4 "$s_host"; then
+            resolver="$SB_BOOTSTRAP_SERVER_TAG"
+        fi
+        config=$(sing_box_cf_add_dns_server "$config" "$dns_type" "$SB_DNS_SERVER_TAG" "$s" "$resolver")
+    else
+        local idx=1
+        local ms_tags=""
+        for s in $main_servers; do
+            local tag="${SB_DNS_SERVER_TAG}-${idx}"
+            local s_host="$(url_get_host "$s")"
+            local resolver=""
+            if ! is_ipv4 "$s_host"; then
+                resolver="$SB_BOOTSTRAP_SERVER_TAG"
+            fi
+            config=$(sing_box_cf_add_dns_server "$config" "$dns_type" "$tag" "$s" "$resolver")
+            ms_tags="${ms_tags:+$ms_tags }$tag"
+            idx=$((idx + 1))
+        done
+        config=$(sing_box_cm_add_fallback_dns_server "$config" "$SB_DNS_SERVER_TAG" "$main_strategy" $ms_tags)
+    fi
+
     config=$(sing_box_cm_add_fakeip_dns_server "$config" "$SB_FAKEIP_DNS_SERVER_TAG" "$SB_FAKEIP_INET4_RANGE")
 
     log "Adding DNS Rules"
@@ -2187,8 +2256,24 @@ get_status() {
 check_dns_available() {
     local dns_type dns_server bootstrap_dns_server
     config_get dns_type "settings" "dns_type"
-    config_get dns_server "settings" "dns_server"
-    config_get bootstrap_dns_server "settings" "bootstrap_dns_server"
+
+    local _ms_list=""
+    _cb_chk_ms() { [ -n "$1" ] && _ms_list="${_ms_list:+$_ms_list }$1"; }
+    config_list_foreach "settings" "dns_server" _cb_chk_ms
+    if [ -n "$_ms_list" ]; then
+        dns_server="${_ms_list%% *}"
+    else
+        config_get dns_server "settings" "dns_server" "77.88.8.8"
+    fi
+
+    local _bs_list=""
+    _cb_chk_bs() { [ -n "$1" ] && _bs_list="${_bs_list:+$_bs_list }$1"; }
+    config_list_foreach "settings" "bootstrap_dns_server" _cb_chk_bs
+    if [ -n "$_bs_list" ]; then
+        bootstrap_dns_server="${_bs_list%% *}"
+    else
+        config_get bootstrap_dns_server "settings" "bootstrap_dns_server" "77.88.8.8"
+    fi
 
     local dns_status=0
     local dns_on_router=0

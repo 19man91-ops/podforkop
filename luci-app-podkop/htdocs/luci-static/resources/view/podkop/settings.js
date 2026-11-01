@@ -19,17 +19,22 @@ function createSettingsContent(section, singBoxFeatures = []) {
   o.rmempty = false;
 
   o = section.option(
-    form.Value,
+    form.DynamicList,
     "dns_server",
     _("DNS Server"),
-    _("Select or enter DNS server address"),
+    _(
+      "Several servers give automatic failover. Select or enter DNS server address",
+    ),
   );
   Object.entries(main.DNS_SERVER_OPTIONS).forEach(([key, label]) => {
     o.value(key, _(label));
   });
-  o.default = "8.8.8.8";
+  o.default = ["77.88.8.8"];
   o.rmempty = false;
   o.validate = function (section_id, value) {
+    if (!value || value.length === 0) {
+      return true;
+    }
     const validation = main.validateDNS(value);
 
     if (validation.valid) {
@@ -40,19 +45,35 @@ function createSettingsContent(section, singBoxFeatures = []) {
   };
 
   o = section.option(
-    form.Value,
+    form.ListValue,
+    "dns_main_fallback_strategy",
+    _("Main DNS Query Mode"),
+    _(
+      "Sequential asks every server in turn until the first answer (automatic failover). Parallel asks every server at once and returns the fastest answer",
+    ),
+  );
+  o.value("sequential", _("Sequential (automatic failover)"));
+  o.value("parallel", _("Parallel (fastest response)"));
+  o.default = "sequential";
+  o.rmempty = false;
+
+  o = section.option(
+    form.DynamicList,
     "bootstrap_dns_server",
     _("Bootstrap DNS server"),
     _(
-      "The DNS server used to look up the IP address of an upstream DNS server",
+      "The DNS server used to look up the IP address of an upstream DNS server. Several servers give automatic failover",
     ),
   );
   Object.entries(main.BOOTSTRAP_DNS_SERVER_OPTIONS).forEach(([key, label]) => {
     o.value(key, _(label));
   });
-  o.default = "77.88.8.8";
+  o.default = ["77.88.8.8"];
   o.rmempty = false;
   o.validate = function (section_id, value) {
+    if (!value || value.length === 0) {
+      return true;
+    }
     const validation = main.validateDNS(value);
 
     if (validation.valid) {
@@ -61,6 +82,19 @@ function createSettingsContent(section, singBoxFeatures = []) {
 
     return validation.message;
   };
+
+  o = section.option(
+    form.ListValue,
+    "dns_bootstrap_fallback_strategy",
+    _("Bootstrap DNS Query Mode"),
+    _(
+      "Sequential asks every server in turn until the first answer (automatic failover). Parallel asks every server at once and returns the fastest answer",
+    ),
+  );
+  o.value("sequential", _("Sequential (automatic failover)"));
+  o.value("parallel", _("Parallel (fastest response)"));
+  o.default = "sequential";
+  o.rmempty = false;
 
   o = section.option(
     form.Value,

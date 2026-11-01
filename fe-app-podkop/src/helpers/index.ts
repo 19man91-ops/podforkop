@@ -17,3 +17,4 @@ export * from './pollDelay';
 export * from './pollChain';
 export * from './tabLifecycle';
 export * from './localDevices';
+export * from './countryFlags';

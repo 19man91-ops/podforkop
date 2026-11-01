@@ -4,6 +4,7 @@
 "require fs";
 "require uci";
 "require ui";
+"require rpc";
 
 // src/validators/validateIp.ts
 function validateIPV4(ip) {
@@ -818,7 +819,7 @@ async function getDashboardSections() {
             const node = proxies.find((p) => p.code === code);
             return {
               code,
-              displayName: node?.value?.name || code,
+              displayName: formatProxyDisplayName(node?.value?.name || code),
               latency: node?.value?.history?.[0]?.delay || 0,
               type: node?.value?.type || "",
               selected: outbound.value?.now === code
@@ -832,7 +833,9 @@ async function getDashboardSections() {
           };
         }
         const activeConfigs = splitProxyString(section.proxy_string);
-        const proxyDisplayName = getProxyUrlName(activeConfigs?.[0]) || outbound?.value?.name || "";
+        const proxyDisplayName = formatProxyDisplayName(
+          getProxyUrlName(activeConfigs?.[0]) || outbound?.value?.name || ""
+        );
         return {
           withTagSelect: false,
           code: outbound?.code || section[".name"],
@@ -859,7 +862,9 @@ async function getDashboardSections() {
           parsedOutbound = null;
         }
         const parsedTag = typeof parsedOutbound?.tag === "string" ? decodeURIComponent(parsedOutbound.tag) : void 0;
-        const proxyDisplayName = parsedTag || outbound?.value?.name || "";
+        const proxyDisplayName = formatProxyDisplayName(
+          parsedTag || outbound?.value?.name || ""
+        );
         return {
           withTagSelect: false,
           code: outbound?.code || section[".name"],
@@ -898,6 +903,7 @@ async function getDashboardSections() {
             if (!displayName) {
               displayName = item?.value?.name || code;
             }
+            displayName = formatProxyDisplayName(displayName);
             return {
               code,
               displayName,
@@ -914,7 +920,9 @@ async function getDashboardSections() {
             )
           })).map((item) => ({
             code: item?.outbound?.code || "",
-            displayName: getProxyUrlName(item.link) || item?.outbound?.value?.name || "",
+            displayName: formatProxyDisplayName(
+              getProxyUrlName(item.link) || item?.outbound?.value?.name || ""
+            ),
             latency: item?.outbound?.value?.history?.[0]?.delay || 0,
             type: item?.outbound?.value?.type || "",
             selected: selector?.value?.now === item?.outbound?.code
@@ -955,6 +963,7 @@ async function getDashboardSections() {
             if (!displayName) {
               displayName = item?.value?.name || code;
             }
+            displayName = formatProxyDisplayName(displayName);
             return {
               code: item?.code || code,
               displayName,
@@ -966,7 +975,9 @@ async function getDashboardSections() {
         } else {
           outbounds = (outbound?.value?.all ?? []).map((code) => proxies.find((item) => item.code === code)).map((item, index) => ({
             code: item?.code || "",
-            displayName: getProxyUrlName(links[index]) || item?.value?.name || "",
+            displayName: formatProxyDisplayName(
+              getProxyUrlName(links[index]) || item?.value?.name || ""
+            ),
             latency: item?.value?.history?.[0]?.delay || 0,
             type: item?.value?.type || "",
             selected: selector?.value?.now === item?.code
@@ -1198,6 +1209,8 @@ var UPDATE_INTERVAL_OPTIONS = {
   "3d": "Every 3 days"
 };
 var DNS_SERVER_OPTIONS = {
+  "77.88.8.8": "77.88.8.8 (Yandex DNS)",
+  "77.88.8.1": "77.88.8.1 (Yandex DNS)",
   "1.1.1.1": "1.1.1.1 (Cloudflare)",
   "8.8.8.8": "8.8.8.8 (Google)",
   "9.9.9.9": "9.9.9.9 (Quad9)",
@@ -1998,6 +2011,384 @@ var SocketManager = class _SocketManager {
 };
 var socket = SocketManager.getInstance();
 
+// src/helpers/element.ts
+function getLuciE() {
+  if (typeof window !== "undefined" && typeof window.E === "function") {
+    return window.E;
+  }
+  if (typeof globalThis !== "undefined" && typeof globalThis.E === "function") {
+    return globalThis.E;
+  }
+  return (tag, attrs, children) => {
+    const el = document.createElement(String(tag));
+    if (attrs && typeof attrs === "object") {
+      Object.entries(attrs).forEach(([k, v]) => {
+        if (k === "class" && typeof v === "string") el.className = v;
+        else if (typeof v === "string") el.setAttribute(k, v);
+      });
+    }
+    if (Array.isArray(children)) {
+      children.forEach((c) => {
+        if (typeof c === "string") el.appendChild(document.createTextNode(c));
+        else if (c instanceof Node) el.appendChild(c);
+      });
+    } else if (typeof children === "string") {
+      el.appendChild(document.createTextNode(children));
+    }
+    return el;
+  };
+}
+function element(...args) {
+  if (args.length >= 3 && (typeof args[2] === "string" || typeof args[2] === "number")) {
+    args[2] = [String(args[2])];
+  }
+  return getLuciE()(...args);
+}
+
+// src/helpers/countryFlags.ts
+var FLAG_EMOJI_PATTERN = /([\u{1f1e6}-\u{1f1ff}]{2}|\u{1f3f4}[\u{e0061}-\u{e007a}]+\u{e007f})/gu;
+var EXACT_FLAG_EMOJI_PATTERN = /^([\u{1f1e6}-\u{1f1ff}]{2}|\u{1f3f4}[\u{e0061}-\u{e007a}]+\u{e007f})$/u;
+function renderFlagEmojis(value) {
+  if (!value) return [];
+  if (typeof document === "undefined") {
+    return [value];
+  }
+  return value.split(FLAG_EMOJI_PATTERN).filter(Boolean).map(
+    (part) => EXACT_FLAG_EMOJI_PATTERN.test(part) ? element("span", { class: "pdk_dashboard-page__flag-emoji" }, part) : part
+  );
+}
+function flagFromCountryCode(code) {
+  const normalized = code.trim().toUpperCase();
+  if (normalized === "UK") return "\u{1F1EC}\u{1F1E7}";
+  if (normalized.length !== 2) return "";
+  const first = normalized.charCodeAt(0);
+  const second = normalized.charCodeAt(1);
+  if (first < 65 || first > 90 || second < 65 || second > 90) return "";
+  return String.fromCodePoint(127462 + first - 65, 127462 + second - 65);
+}
+var ISO_COUNTRY_CODES = /* @__PURE__ */ new Set([
+  "AD",
+  "AE",
+  "AF",
+  "AG",
+  "AI",
+  "AL",
+  "AM",
+  "AO",
+  "AQ",
+  "AR",
+  "AS",
+  "AT",
+  "AU",
+  "AW",
+  "AX",
+  "AZ",
+  "BA",
+  "BB",
+  "BD",
+  "BE",
+  "BF",
+  "BG",
+  "BH",
+  "BI",
+  "BJ",
+  "BL",
+  "BM",
+  "BN",
+  "BO",
+  "BQ",
+  "BR",
+  "BS",
+  "BT",
+  "BV",
+  "BW",
+  "BY",
+  "BZ",
+  "CA",
+  "CC",
+  "CD",
+  "CF",
+  "CG",
+  "CH",
+  "CI",
+  "CK",
+  "CL",
+  "CM",
+  "CN",
+  "CO",
+  "CR",
+  "CU",
+  "CV",
+  "CW",
+  "CX",
+  "CY",
+  "CZ",
+  "DE",
+  "DJ",
+  "DK",
+  "DM",
+  "DO",
+  "DZ",
+  "EC",
+  "EE",
+  "EG",
+  "EH",
+  "ER",
+  "ES",
+  "ET",
+  "FI",
+  "FJ",
+  "FK",
+  "FM",
+  "FO",
+  "FR",
+  "GA",
+  "GB",
+  "GD",
+  "GE",
+  "GF",
+  "GG",
+  "GH",
+  "GI",
+  "GL",
+  "GM",
+  "GN",
+  "GP",
+  "GQ",
+  "GR",
+  "GS",
+  "GT",
+  "GU",
+  "GW",
+  "GY",
+  "HK",
+  "HM",
+  "HN",
+  "HR",
+  "HT",
+  "HU",
+  "ID",
+  "IE",
+  "IL",
+  "IM",
+  "IN",
+  "IO",
+  "IQ",
+  "IR",
+  "IS",
+  "IT",
+  "JE",
+  "JM",
+  "JO",
+  "JP",
+  "KE",
+  "KG",
+  "KH",
+  "KI",
+  "KM",
+  "KN",
+  "KP",
+  "KR",
+  "KW",
+  "KY",
+  "KZ",
+  "LA",
+  "LB",
+  "LC",
+  "LI",
+  "LK",
+  "LR",
+  "LS",
+  "LT",
+  "LU",
+  "LV",
+  "LY",
+  "MA",
+  "MC",
+  "MD",
+  "ME",
+  "MF",
+  "MG",
+  "MH",
+  "MK",
+  "ML",
+  "MM",
+  "MN",
+  "MO",
+  "MP",
+  "MQ",
+  "MR",
+  "MS",
+  "MT",
+  "MU",
+  "MV",
+  "MW",
+  "MX",
+  "MY",
+  "MZ",
+  "NA",
+  "NC",
+  "NE",
+  "NF",
+  "NG",
+  "NI",
+  "NL",
+  "NO",
+  "NP",
+  "NR",
+  "NU",
+  "NZ",
+  "OM",
+  "PA",
+  "PE",
+  "PF",
+  "PG",
+  "PH",
+  "PK",
+  "PL",
+  "PM",
+  "PN",
+  "PR",
+  "PS",
+  "PT",
+  "PW",
+  "PY",
+  "QA",
+  "RE",
+  "RO",
+  "RS",
+  "RU",
+  "RW",
+  "SA",
+  "SB",
+  "SC",
+  "SD",
+  "SE",
+  "SG",
+  "SH",
+  "SI",
+  "SJ",
+  "SK",
+  "SL",
+  "SM",
+  "SN",
+  "SO",
+  "SR",
+  "SS",
+  "ST",
+  "SV",
+  "SX",
+  "SY",
+  "SZ",
+  "TC",
+  "TD",
+  "TF",
+  "TG",
+  "TH",
+  "TJ",
+  "TK",
+  "TL",
+  "TM",
+  "TN",
+  "TO",
+  "TR",
+  "TT",
+  "TV",
+  "TW",
+  "TZ",
+  "UA",
+  "UG",
+  "UM",
+  "US",
+  "UY",
+  "UZ",
+  "VA",
+  "VC",
+  "VE",
+  "VG",
+  "VI",
+  "VN",
+  "VU",
+  "WF",
+  "WS",
+  "YE",
+  "YT",
+  "ZA",
+  "ZM",
+  "ZW",
+  "UK"
+]);
+var COUNTRY_NAMES = [
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:russia|россия|рф)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "RU"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:finland|финляндия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "FI"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:germany|германия|deutschland)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "DE"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:netherlands|нидерланды|holland)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "NL"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:sweden|швеция)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "SE"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:usa|сша|united states)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "US"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:france|франция)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "FR"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:united kingdom|великобритания|england|англия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "GB"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:poland|польша)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "PL"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:turkey|турция)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "TR"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:kazakhstan|казахстан)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "KZ"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:japan|япония)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "JP"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:singapore|сингапур)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "SG"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:hong\s*kong|гонконг)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "HK"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:austria|австрия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "AT"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:switzerland|швейцария)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "CH"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:spain|испания)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "ES"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:italy|италия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "IT"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:estonia|эстония)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "EE"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:latvia|латвия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "LV"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:lithuania|литва)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "LT"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:czech|чехия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "CZ"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:uae|оаэ|dubai|дубай)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "AE"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:serbia|сербия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "RS"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:cyprus|кипр)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "CY"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:georgia|грузия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "GE"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:armenia|армения)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "AM"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:moldova|молдова)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "MD"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:bulgaria|болгария)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "BG"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:romania|румыния)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "RO"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:norway|норвегия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "NO"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:denmark|дания)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "DK"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:canada|канада)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "CA"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:brazil|бразилия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "BR"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:india|индия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "IN"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:israel|израиль)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "IL"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:iceland|исландия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "IS"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:ireland|ирландия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "IE"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:ukraine|украина)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "UA"],
+  [/(?:^|[^a-zA-Zа-яА-Я0-9])(?:belarus|беларусь|белоруссия)(?:$|[^a-zA-Zа-яА-Я0-9])/i, "BY"]
+];
+function formatProxyDisplayName(rawName) {
+  if (!rawName) return "";
+  let name = rawName.replace(/^.*(?:podkop|forkop)?-sub-[0-9a-fA-F]+\//, "");
+  name = name.replace(/^[a-zA-Z0-9_-]+\/(?=.)/, "");
+  name = name.trim();
+  if (FLAG_EMOJI_PATTERN.test(name)) {
+    return name;
+  }
+  const prefixMatch = name.match(/^\[?([A-Za-z]{2})\]?[-_\s:.]+(.*)$/);
+  if (prefixMatch) {
+    const candidate = prefixMatch[1].toUpperCase();
+    if (ISO_COUNTRY_CODES.has(candidate)) {
+      const flag = flagFromCountryCode(candidate);
+      if (flag) {
+        return `${flag} ${name}`;
+      }
+    }
+  }
+  for (const [regex, code] of COUNTRY_NAMES) {
+    if (regex.test(name)) {
+      const flag = flagFromCountryCode(code);
+      if (flag) {
+        return `${flag} ${name}`;
+      }
+    }
+  }
+  return name;
+}
+
 // src/podkop/tabs/dashboard/partials/renderSections.ts
 function renderFailedState() {
   return E(
@@ -2050,7 +2441,7 @@ function renderDefaultState({
         click: () => section.withTagSelect && onChooseOutbound(section.code, outbound.code)
       },
       [
-        E("b", {}, outbound.displayName),
+        E("b", {}, renderFlagEmojis(outbound.displayName)),
         E("div", { class: "pdk_dashboard-page__outbound-grid__item__footer" }, [
           E(
             "div",
@@ -2630,6 +3021,23 @@ async function initController() {
 
 // src/podkop/tabs/dashboard/styles.ts
 var styles = `
+@font-face {
+    font-family: "Twemoji Country Flags";
+    src: url("/luci-static/resources/view/podkop/fonts/TwemojiCountryFlags.woff2") format("woff2");
+    font-display: swap;
+    font-style: normal;
+    font-weight: normal;
+    unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E0063, U+E0065, U+E0067, U+E006C, U+E006E, U+E0073-E0074, U+E0077, U+E007F;
+}
+
+.pdk_dashboard-page__flag-emoji {
+    font-family: "Twemoji Country Flags", "Segoe UI Emoji", sans-serif;
+    font-size: 1.2em;
+    vertical-align: -0.05em;
+    margin-right: 5px;
+    display: inline-block;
+}
+
 #cbi-podkop-dashboard-_mount_node > div {
     width: 100%;
 }
@@ -4939,40 +5347,6 @@ var DiagnosticTab = {
   styles: styles4
 };
 
-// src/helpers/element.ts
-function getLuciE() {
-  if (typeof window !== "undefined" && typeof window.E === "function") {
-    return window.E;
-  }
-  if (typeof globalThis !== "undefined" && typeof globalThis.E === "function") {
-    return globalThis.E;
-  }
-  return (tag, attrs, children) => {
-    const el = document.createElement(String(tag));
-    if (attrs && typeof attrs === "object") {
-      Object.entries(attrs).forEach(([k, v]) => {
-        if (k === "class" && typeof v === "string") el.className = v;
-        else if (typeof v === "string") el.setAttribute(k, v);
-      });
-    }
-    if (Array.isArray(children)) {
-      children.forEach((c) => {
-        if (typeof c === "string") el.appendChild(document.createTextNode(c));
-        else if (c instanceof Node) el.appendChild(c);
-      });
-    } else if (typeof children === "string") {
-      el.appendChild(document.createTextNode(children));
-    }
-    return el;
-  };
-}
-function element(...args) {
-  if (args.length >= 3 && (typeof args[2] === "string" || typeof args[2] === "number")) {
-    args[2] = [String(args[2])];
-  }
-  return getLuciE()(...args);
-}
-
 // src/podkop/tabs/monitoring/render.ts
 function render3() {
   return element(
@@ -5256,25 +5630,47 @@ function createTabLifecycle(options) {
 var callHostHints;
 var callDHCPLeases;
 var callNetworkInterfaceDump;
-try {
-  if (typeof rpc !== "undefined" && typeof rpc.declare === "function") {
-    callHostHints = rpc.declare({
-      object: "luci-rpc",
-      method: "getHostHints",
-      expect: { "": {} }
-    });
-    callDHCPLeases = rpc.declare({
-      object: "luci-rpc",
-      method: "getDHCPLeases",
-      expect: { "": {} }
-    });
-    callNetworkInterfaceDump = rpc.declare({
-      object: "network.interface",
-      method: "dump",
-      expect: { interface: [] }
-    });
+function getRpcObj() {
+  if (typeof rpc !== "undefined" && rpc) return rpc;
+  const g = globalThis;
+  if (g.L?.rpc) return g.L.rpc;
+  if (g.rpc) return g.rpc;
+  if (typeof window !== "undefined" && window.L?.rpc) return window.L.rpc;
+  return void 0;
+}
+function initRpcCalls() {
+  const rpcObj = getRpcObj();
+  if (!rpcObj || typeof rpcObj.declare !== "function") return;
+  if (!callHostHints) {
+    try {
+      callHostHints = rpcObj.declare({
+        object: "luci-rpc",
+        method: "getHostHints",
+        expect: { "": {} }
+      });
+    } catch {
+    }
   }
-} catch {
+  if (!callDHCPLeases) {
+    try {
+      callDHCPLeases = rpcObj.declare({
+        object: "luci-rpc",
+        method: "getDHCPLeases",
+        expect: { "": {} }
+      });
+    } catch {
+    }
+  }
+  if (!callNetworkInterfaceDump) {
+    try {
+      callNetworkInterfaceDump = rpcObj.declare({
+        object: "network.interface",
+        method: "dump",
+        expect: { interface: [] }
+      });
+    } catch {
+    }
+  }
 }
 var localDevicesCache = null;
 var localDevicesPromise = null;
@@ -5288,51 +5684,91 @@ function loadLocalDevices() {
   if (localDevicesPromise) {
     return localDevicesPromise;
   }
+  initRpcCalls();
   const hostHintsPromise = typeof callHostHints === "function" ? callHostHints().catch(() => ({})) : Promise.resolve({});
   const dhcpLeasesPromise = typeof callDHCPLeases === "function" ? callDHCPLeases().catch(() => ({})) : Promise.resolve({});
   const networkDumpPromise = typeof callNetworkInterfaceDump === "function" ? callNetworkInterfaceDump().catch(() => ({})) : Promise.resolve({});
-  const uciDhcpPromise = typeof uci !== "undefined" && typeof uci.load === "function" ? uci.load("dhcp").then(() => uci.sections("dhcp", "host")).catch(() => []) : Promise.resolve([]);
+  const uciObj = typeof uci !== "undefined" && uci || globalThis.L?.uci || globalThis.uci;
+  const uciDhcpPromise = uciObj && typeof uciObj.load === "function" ? uciObj.load("dhcp").then(() => uciObj.sections("dhcp", "host")).catch(() => []) : Promise.resolve([]);
+  const fsObj = typeof fs !== "undefined" && fs || globalThis.L?.fs || globalThis.fs;
+  const leasesFilePromise = fsObj && typeof fsObj.read_direct === "function" ? fsObj.read_direct("/tmp/dhcp.leases").catch(() => "") : Promise.resolve("");
   localDevicesPromise = Promise.all([
     hostHintsPromise,
     dhcpLeasesPromise,
     networkDumpPromise,
-    uciDhcpPromise
-  ]).then(([hostHints, dhcpLeases, _networkInterfaces, staticHosts]) => {
-    const names = {};
-    if (hostHints && typeof hostHints === "object") {
-      Object.values(hostHints).forEach(
-        (hint) => {
-          if (!hint || typeof hint !== "object") return;
-          const name = normalizeName(hint.name);
-          if (!name) return;
-          const ipaddrs = Array.isArray(hint.ipaddrs) ? hint.ipaddrs : [];
-          ipaddrs.forEach((ip) => {
-            if (ip && validateIP(ip).valid) names[ip] = name;
-          });
-        }
-      );
-    }
-    if (dhcpLeases && typeof dhcpLeases === "object" && Array.isArray(dhcpLeases.dhcp_leases)) {
-      (dhcpLeases.dhcp_leases || []).forEach(
-        (lease) => {
+    uciDhcpPromise,
+    leasesFilePromise
+  ]).then(
+    ([
+      hostHints,
+      dhcpLeases,
+      networkInterfaces,
+      staticHosts,
+      leasesContent
+    ]) => {
+      const names = {};
+      if (typeof leasesContent === "string" && leasesContent) {
+        leasesContent.split("\n").forEach((line) => {
+          const parts = line.trim().split(/\s+/);
+          if (parts.length >= 4) {
+            const ip = parts[2];
+            const hostname = parts[3];
+            if (ip && hostname && hostname !== "*" && validateIP(ip).valid) {
+              names[ip] = normalizeName(hostname);
+            }
+          }
+        });
+      }
+      if (hostHints && typeof hostHints === "object") {
+        Object.values(hostHints).forEach(
+          (hint) => {
+            if (!hint || typeof hint !== "object") return;
+            const name = normalizeName(hint.name);
+            if (!name) return;
+            const ipaddrs = [
+              ...Array.isArray(hint.ipaddrs) ? hint.ipaddrs : [],
+              ...Array.isArray(hint.ip6addrs) ? hint.ip6addrs : []
+            ];
+            ipaddrs.forEach((ip) => {
+              if (ip && validateIP(ip).valid) names[ip] = name;
+            });
+          }
+        );
+      }
+      const leaseEntries = dhcpLeases?.dhcp_leases || dhcpLeases?.leases || [];
+      if (Array.isArray(leaseEntries)) {
+        leaseEntries.forEach((lease) => {
           if (!lease || typeof lease !== "object") return;
           const name = normalizeName(lease.hostname);
           const ip = `${lease.ipaddr || ""}`.trim();
           if (ip && name && validateIP(ip).valid) names[ip] = name;
-        }
-      );
+        });
+      }
+      if (Array.isArray(staticHosts)) {
+        staticHosts.forEach((host) => {
+          if (!host || typeof host !== "object") return;
+          const name = normalizeName(host.name);
+          const ip = `${host.ip || ""}`.trim();
+          if (ip && name && validateIP(ip).valid) names[ip] = name;
+        });
+      }
+      const ifaceList = Array.isArray(networkInterfaces) ? networkInterfaces : networkInterfaces?.interface;
+      if (Array.isArray(ifaceList)) {
+        ifaceList.forEach((iface) => {
+          const ipv4 = Array.isArray(iface?.["ipv4-address"]) ? iface["ipv4-address"] : [];
+          const ipv6 = Array.isArray(iface?.["ipv6-address"]) ? iface["ipv6-address"] : [];
+          [...ipv4, ...ipv6].forEach((addr) => {
+            const ip = typeof addr === "string" ? addr : addr?.address;
+            if (ip && names[ip]) {
+              delete names[ip];
+            }
+          });
+        });
+      }
+      localDevicesCache = { names };
+      return localDevicesCache;
     }
-    if (Array.isArray(staticHosts)) {
-      staticHosts.forEach((host) => {
-        if (!host || typeof host !== "object") return;
-        const name = normalizeName(host.name);
-        const ip = `${host.ip || ""}`.trim();
-        if (ip && name && validateIP(ip).valid) names[ip] = name;
-      });
-    }
-    localDevicesCache = { names };
-    return localDevicesCache;
-  }).catch(() => ({ names: {} })).finally(() => {
+  ).catch(() => ({ names: {} })).finally(() => {
     localDevicesPromise = null;
   });
   return localDevicesPromise;
@@ -5426,7 +5862,7 @@ function renderList(rows, { closable, sort }) {
         },
         [
           renderHeading("host", _("Host")),
-          renderHeading("source", _("Source")),
+          renderHeading("source", _("Source / Device")),
           renderHeading("route", _("Route")),
           renderHeading("network", _("Type")),
           renderSortHeading("time", _("Time"), sort),
@@ -5488,22 +5924,39 @@ function renderValue(text2, className, fullValue = text2) {
     text2
   );
 }
-function renderSource(item) {
-  const label = sourceLabel(item.sourceName, item.sourceDetail);
-  if (item.system) {
+function renderSource({
+  sourceName: name,
+  sourceDetail: detail,
+  system
+}) {
+  if (system) {
     return renderValue(
-      item.sourceName,
+      name,
       "fkp_monitoring-page__value fkp_monitoring-page__tag fkp_monitoring-page__tag--builtin",
-      label
+      _("The router itself: its services and programs")
     );
   }
-  const detail = item.sourceDetail && element("span", { class: "fkp_monitoring-page__muted" }, item.sourceDetail);
-  return renderValue(
-    [item.sourceName, detail ? " " : "", detail].filter(
-      Boolean
-    ),
-    "fkp_monitoring-page__value",
-    label
+  const shown = name ? `${name} (${detail})` : detail || "-";
+  const label = sourceLabel(name, detail) || shown;
+  const muted = (text2) => element("span", { class: "fkp_monitoring-page__muted" }, text2);
+  return element(
+    "span",
+    {
+      class: "fkp_monitoring-page__value",
+      title: label,
+      "data-copy-value": shown
+    },
+    name ? [
+      element(
+        "span",
+        {
+          class: "fkp_monitoring-page__source-name",
+          style: "font-weight: 500;"
+        },
+        name
+      ),
+      ...detail ? [" ", muted(`(${detail})`)] : []
+    ] : [muted(shown)]
   );
 }
 function renderRoute(route, direct) {
@@ -7188,6 +7641,8 @@ return baseclass.extend({
   createTabLifecycle,
   domainToUnicode,
   executeShellCommand,
+  flagFromCountryCode,
+  formatProxyDisplayName,
   getClashApiUrl,
   getClashSocketUrl,
   getClashUIUrl,
@@ -7206,6 +7661,7 @@ return baseclass.extend({
   parseValueList,
   pollDelayForDuration,
   preserveScrollForPage,
+  renderFlagEmojis,
   socket,
   splitProxyString,
   store,

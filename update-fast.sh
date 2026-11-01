@@ -10,32 +10,38 @@ if ! command -v wget >/dev/null 2>&1; then
     FETCH_CMD="uclient-fetch -q --no-check-certificate -O"
 fi
 
-mkdir -p /www/luci-static/resources/view/podkop /usr/bin /usr/lib /etc/init.d
+mkdir -p /www/luci-static/resources/view/podkop/fonts /usr/bin /usr/lib /etc/init.d /usr/share/rpcd/acl.d
 
-echo "1/7 Downloading podkop.js (Drag & Drop + Save & Apply)..."
+echo "1/10 Downloading podkop.js (Drag & Drop + Save & Apply)..."
 $FETCH_CMD /www/luci-static/resources/view/podkop/podkop.js "${BASE_URL}/luci-app-podkop/htdocs/luci-static/resources/view/podkop/podkop.js?t=${TS}"
 
-echo "2/7 Downloading section.js (Mode badges)..."
+echo "2/10 Downloading section.js (Mode badges)..."
 $FETCH_CMD /www/luci-static/resources/view/podkop/section.js "${BASE_URL}/luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js?t=${TS}"
 
-echo "3/7 Downloading monitoring.js..."
-$FETCH_CMD /www/luci-static/resources/view/podkop/monitoring.js "${BASE_URL}/luci-app-podkop/htdocs/luci-static/resources/view/podkop/monitoring.js?t=${TS}"
+echo "3/10 Downloading settings.js (Multiple DNS failover)..."
+$FETCH_CMD /www/luci-static/resources/view/podkop/settings.js "${BASE_URL}/luci-app-podkop/htdocs/luci-static/resources/view/podkop/settings.js?t=${TS}"
 
-echo "4/7 Downloading main.js (UI Bundle)..."
+echo "4/10 Downloading main.js (UI Bundle with flags & device names)..."
 $FETCH_CMD /www/luci-static/resources/view/podkop/main.js "${BASE_URL}/luci-app-podkop/htdocs/luci-static/resources/view/podkop/main.js?t=${TS}"
 
-echo "5/7 Downloading /usr/bin/podkop..."
+echo "5/10 Downloading /usr/bin/podkop..."
 $FETCH_CMD /usr/bin/podkop "${BASE_URL}/podkop/files/usr/bin/podkop?t=${TS}"
 
-echo "6/7 Downloading /usr/lib/subscriptions.sh..."
+echo "6/10 Downloading /usr/lib/sing_box_config_manager.sh..."
+$FETCH_CMD /usr/lib/sing_box_config_manager.sh "${BASE_URL}/podkop/files/usr/lib/sing_box_config_manager.sh?t=${TS}"
+
+echo "7/10 Downloading /usr/lib/subscriptions.sh..."
 $FETCH_CMD /usr/lib/subscriptions.sh "${BASE_URL}/podkop/files/usr/lib/subscriptions.sh?t=${TS}"
 
-echo "7/7 Downloading /etc/init.d/podkop..."
-$FETCH_CMD /etc/init.d/podkop "${BASE_URL}/podkop/files/etc/init.d/podkop?t=${TS}"
+echo "8/10 Updating ACL permissions..."
+$FETCH_CMD /usr/share/rpcd/acl.d/luci-app-podkop.json "${BASE_URL}/luci-app-podkop/root/usr/share/rpcd/acl.d/luci-app-podkop.json?t=${TS}"
+
+echo "9/10 Downloading TwemojiCountryFlags font..."
+$FETCH_CMD /www/luci-static/resources/view/podkop/fonts/TwemojiCountryFlags.woff2 "${BASE_URL}/luci-app-podkop/htdocs/luci-static/resources/view/podkop/fonts/TwemojiCountryFlags.woff2?t=${TS}"
 
 chmod +x /usr/bin/podkop /etc/init.d/podkop
 
-echo "Flushing LuCI cache and restarting web services..."
+echo "10/10 Flushing LuCI cache and restarting web services..."
 rm -f /tmp/luci-indexcache* /tmp/luci-modulecache* /tmp/luci-sessions* 2>/dev/null || true
 
 /etc/init.d/uhttpd restart >/dev/null 2>&1 || true

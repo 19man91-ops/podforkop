@@ -95,6 +95,7 @@ function createSectionContent(section, singBoxFeatures = []) {
     return E("span", { class: "badge", style: style }, children);
   };
   o.cfgvalue = o.textvalue;
+  o.rawhtml = true;
 
   o = section.option(
     form.ListValue,

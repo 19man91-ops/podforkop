@@ -1,6 +1,10 @@
 import { getConfigSections } from './getConfigSections';
 import { Podkop } from '../../types';
-import { getProxyUrlName, splitProxyString } from '../../../helpers';
+import {
+  formatProxyDisplayName,
+  getProxyUrlName,
+  splitProxyString,
+} from '../../../helpers';
 import { PodkopShellMethods } from '../shell';
 
 function escapeRegExp(str: string): string {
@@ -54,7 +58,7 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
               const node = proxies.find((p) => p.code === code);
               return {
                 code,
-                displayName: node?.value?.name || code,
+                displayName: formatProxyDisplayName(node?.value?.name || code),
                 latency: node?.value?.history?.[0]?.delay || 0,
                 type: node?.value?.type || '',
                 selected: outbound.value?.now === code,
@@ -71,8 +75,9 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
 
           const activeConfigs = splitProxyString(section.proxy_string);
 
-          const proxyDisplayName =
-            getProxyUrlName(activeConfigs?.[0]) || outbound?.value?.name || '';
+          const proxyDisplayName = formatProxyDisplayName(
+            getProxyUrlName(activeConfigs?.[0]) || outbound?.value?.name || '',
+          );
 
           return {
             withTagSelect: false,
@@ -107,7 +112,9 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
             typeof parsedOutbound?.tag === 'string'
               ? decodeURIComponent(parsedOutbound.tag)
               : undefined;
-          const proxyDisplayName = parsedTag || outbound?.value?.name || '';
+          const proxyDisplayName = formatProxyDisplayName(
+            parsedTag || outbound?.value?.name || '',
+          );
 
           return {
             withTagSelect: false,
@@ -156,6 +163,7 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
               if (!displayName) {
                 displayName = item?.value?.name || code;
               }
+              displayName = formatProxyDisplayName(displayName);
 
               return {
                 code,
@@ -176,10 +184,11 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
               }))
               .map((item) => ({
                 code: item?.outbound?.code || '',
-                displayName:
+                displayName: formatProxyDisplayName(
                   getProxyUrlName(item.link) ||
-                  item?.outbound?.value?.name ||
-                  '',
+                    item?.outbound?.value?.name ||
+                    '',
+                ),
                 latency: item?.outbound?.value?.history?.[0]?.delay || 0,
                 type: item?.outbound?.value?.type || '',
                 selected: selector?.value?.now === item?.outbound?.code,
@@ -224,6 +233,7 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
               if (!displayName) {
                 displayName = item?.value?.name || code;
               }
+              displayName = formatProxyDisplayName(displayName);
 
               return {
                 code: item?.code || code,
@@ -238,8 +248,9 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
               .map((code) => proxies.find((item) => item.code === code))
               .map((item, index) => ({
                 code: item?.code || '',
-                displayName:
+                displayName: formatProxyDisplayName(
                   getProxyUrlName(links[index]) || item?.value?.name || '',
+                ),
                 latency: item?.value?.history?.[0]?.delay || 0,
                 type: item?.value?.type || '',
                 selected: selector?.value?.now === item?.code,

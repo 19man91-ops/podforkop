@@ -1,4 +1,5 @@
 import { Podkop } from '../../../types';
+import { renderFlagEmojis } from '../../../../helpers/countryFlags';
 
 interface IRenderSectionsProps {
   loading: boolean;
@@ -70,7 +71,7 @@ export function renderDefaultState({
           onChooseOutbound(section.code, outbound.code),
       },
       [
-        E('b', {}, outbound.displayName),
+        E('b', {}, renderFlagEmojis(outbound.displayName)),
         E('div', { class: 'pdk_dashboard-page__outbound-grid__item__footer' }, [
           E(
             'div',

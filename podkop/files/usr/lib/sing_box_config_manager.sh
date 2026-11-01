@@ -234,6 +234,37 @@ sing_box_cm_add_fakeip_dns_server() {
 }
 
 #######################################
+# Add a fallback DNS server to the DNS section of a sing-box JSON configuration.
+# Arguments:
+#   config: string (JSON), sing-box configuration to modify
+#   tag: string, identifier for the fallback DNS server
+#   strategy: string, "sequential" or "parallel"
+#   servers: space-separated list of server tags
+# Outputs:
+#   Writes updated JSON configuration to stdout
+# Example:
+#   CONFIG=$(sing_box_cm_add_fallback_dns_server "$CONFIG" "dns-server" "sequential" "dns-server-1" "dns-server-2")
+#######################################
+sing_box_cm_add_fallback_dns_server() {
+    local config="$1"
+    local tag="$2"
+    local strategy="$3"
+    shift 3
+    local servers="$*"
+
+    echo "$config" | jq \
+        --arg tag "$tag" \
+        --arg strategy "$strategy" \
+        --arg servers "$servers" \
+        '.dns.servers += [{
+            type: "fallback",
+            tag: $tag,
+            servers: ($servers | split(" ") | map(select(length > 0))),
+            strategy: $strategy
+        }]'
+}
+
+#######################################
 # Add a DNS routing rule to the DNS section of a sing-box JSON configuration.
 # Arguments:
 #   config: string (JSON), sing-box configuration to modify

@@ -749,6 +749,30 @@ msgstr "Текстовый список"
 msgid "The DNS server used to look up the IP address of an upstream DNS server"
 msgstr "DNS-сервер, используемый для поиска IP-адреса вышестоящего DNS-сервера"
 
+msgid "Source / Device"
+msgstr "Источник / Устройство"
+
+msgid "Main DNS Query Mode"
+msgstr "Режим запросов основного DNS"
+
+msgid "Bootstrap DNS Query Mode"
+msgstr "Режим запросов Bootstrap DNS"
+
+msgid "Sequential (automatic failover)"
+msgstr "Последовательно (автоматическое переключение)"
+
+msgid "Parallel (fastest response)"
+msgstr "Параллельно (быстрый ответ)"
+
+msgid "Several servers give automatic failover. Select or enter DNS server address"
+msgstr "Несколько серверов обеспечивают автоматическое переключение. Выберите или введите адрес DNS-сервера"
+
+msgid "The DNS server used to look up the IP address of an upstream DNS server. Several servers give automatic failover"
+msgstr "DNS-сервер для поиска адреса вышестоящего DNS. Несколько серверов обеспечивают автоматическое переключение"
+
+msgid "Sequential asks every server in turn until the first answer (automatic failover). Parallel asks every server at once and returns the fastest answer"
+msgstr "Последовательно опрашивает серверы по очереди (автопереключение). Параллельно опрашивает все сразу (быстрый ответ)"
+
 msgid "The interval between connectivity tests"
 msgstr "Интервал между тестами подключения"
 

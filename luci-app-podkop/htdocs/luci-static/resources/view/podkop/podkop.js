@@ -4,6 +4,7 @@
 "require fs";
 "require ui";
 "require uci";
+"require rpc";
 "require baseclass";
 "require network";
 "require view.podkop.main as main";

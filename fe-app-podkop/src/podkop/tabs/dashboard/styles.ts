@@ -1,5 +1,22 @@
 // language=CSS
 export const styles = `
+@font-face {
+    font-family: "Twemoji Country Flags";
+    src: url("/luci-static/resources/view/podkop/fonts/TwemojiCountryFlags.woff2") format("woff2");
+    font-display: swap;
+    font-style: normal;
+    font-weight: normal;
+    unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E0063, U+E0065, U+E0067, U+E006C, U+E006E, U+E0073-E0074, U+E0077, U+E007F;
+}
+
+.pdk_dashboard-page__flag-emoji {
+    font-family: "Twemoji Country Flags", "Segoe UI Emoji", sans-serif;
+    font-size: 1.2em;
+    vertical-align: -0.05em;
+    margin-right: 5px;
+    display: inline-block;
+}
+
 #cbi-podkop-dashboard-_mount_node > div {
     width: 100%;
 }

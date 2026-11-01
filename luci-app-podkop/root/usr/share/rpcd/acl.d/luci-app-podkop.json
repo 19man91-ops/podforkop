@@ -8,15 +8,27 @@
         ],
         "/usr/bin/podkop": [
           "exec"
+        ],
+        "/tmp/dhcp.leases": [
+          "read"
         ]
       },
       "ubus": {
         "service": [
           "list"
+        ],
+        "luci-rpc": [
+          "getDHCPLeases",
+          "getHostHints"
+        ],
+        "network.interface": [
+          "dump"
         ]
       },
       "uci": [
-        "podkop"
+        "podkop",
+        "dhcp",
+        "network"
       ]
     },
     "write": {
