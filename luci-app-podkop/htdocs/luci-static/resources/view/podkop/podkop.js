@@ -63,7 +63,10 @@ function enableRowDragAndDrop(containerNode) {
         row.classList.add("dragging");
         row.style.cursor = "grabbing";
         e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", row.getAttribute("data-sid") || "");
+        e.dataTransfer.setData(
+          "text/plain",
+          row.getAttribute("data-sid") || "",
+        );
       });
 
       row.addEventListener("dragend", () => {
@@ -228,10 +231,16 @@ const EntryPoint = {
     // Render dashboard content
     dashboard.createDashboardContent(dashboardSection);
 
-    const monitoringSection = podkopMap.section(form.TypedSection, "monitoring", _("Monitoring"));
+    const monitoringSection = podkopMap.section(
+      form.TypedSection,
+      "monitoring",
+      _("Monitoring"),
+    );
     monitoringSection.anonymous = true;
     monitoringSection.addremove = false;
-    monitoringSection.cfgsections = function () { return ["monitoring"]; };
+    monitoringSection.cfgsections = function () {
+      return ["monitoring"];
+    };
     monitoring.createMonitoringContent(monitoringSection);
 
     // Inject core service
@@ -244,15 +253,35 @@ const EntryPoint = {
 
   handleSaveApply(ev, mode) {
     return this.handleSave(ev).then(() => {
-      let restarted = false;
-      const doRestart = () => {
-        if (restarted) return;
-        restarted = true;
-        fs.exec_direct("/etc/init.d/podkop", ["restart"]).catch(() => {});
-      };
-      document.addEventListener("uci-applied", doRestart, { once: true });
-      setTimeout(doRestart, 4000);
-      ui.changes.apply(mode == "0");
+      ui.showModal(_("Applying changes"), [
+        E(
+          "p",
+          { class: "spinning" },
+          _("Applying configuration and restarting Podkop service..."),
+        ),
+      ]);
+
+      return ui.changes
+        .apply(mode == "0")
+        .then(() => {
+          ui.showModal(_("Restarting service"), [
+            E("p", { class: "spinning" }, _("Restarting Podkop service...")),
+          ]);
+          return fs
+            .exec("/etc/init.d/podkop", ["restart"])
+            .catch(() => {})
+            .finally(() => {
+              ui.hideModal();
+            });
+        })
+        .catch((err) => {
+          ui.hideModal();
+          ui.addNotification(
+            null,
+            E("p", {}, err ? err.message : _("Failed to apply changes")),
+            "error",
+          );
+        });
     });
   },
 };

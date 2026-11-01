@@ -28,7 +28,7 @@ stop_service() {
 }
 
 reload_service() {
-    /etc/init.d/podkop restart
+    /usr/bin/podkop restart
 }
 
 service_triggers() {
@@ -42,7 +42,6 @@ service_triggers() {
 
     procd_open_trigger
     procd_add_reload_trigger "podkop"
-    procd_add_config_trigger "config.change" "$NAME" "$initscript" restart 'on_config_change'
 
     if [ "$enable_badwan_interface_monitoring" = "1" ]; then
         for iface in $badwan_monitored_interfaces; do

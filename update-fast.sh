@@ -33,15 +33,18 @@ $FETCH_CMD /usr/lib/sing_box_config_manager.sh "${BASE_URL}/podkop/files/usr/lib
 echo "7/10 Downloading /usr/lib/subscriptions.sh..."
 $FETCH_CMD /usr/lib/subscriptions.sh "${BASE_URL}/podkop/files/usr/lib/subscriptions.sh?t=${TS}"
 
-echo "8/10 Updating ACL permissions..."
+echo "8/11 Updating ACL permissions..."
 $FETCH_CMD /usr/share/rpcd/acl.d/luci-app-podkop.json "${BASE_URL}/luci-app-podkop/root/usr/share/rpcd/acl.d/luci-app-podkop.json?t=${TS}"
 
-echo "9/10 Downloading TwemojiCountryFlags font..."
+echo "9/11 Downloading /etc/init.d/podkop..."
+$FETCH_CMD /etc/init.d/podkop "${BASE_URL}/podkop/files/etc/init.d/podkop?t=${TS}"
+
+echo "10/11 Downloading TwemojiCountryFlags font..."
 $FETCH_CMD /www/luci-static/resources/view/podkop/fonts/TwemojiCountryFlags.woff2 "${BASE_URL}/luci-app-podkop/htdocs/luci-static/resources/view/podkop/fonts/TwemojiCountryFlags.woff2?t=${TS}"
 
 chmod +x /usr/bin/podkop /etc/init.d/podkop
 
-echo "10/10 Flushing LuCI cache and restarting web services..."
+echo "11/11 Flushing LuCI cache and restarting web services..."
 rm -f /tmp/luci-indexcache* /tmp/luci-modulecache* /tmp/luci-sessions* 2>/dev/null || true
 
 /etc/init.d/uhttpd restart >/dev/null 2>&1 || true

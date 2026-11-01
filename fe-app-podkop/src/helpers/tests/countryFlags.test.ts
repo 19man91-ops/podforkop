@@ -31,8 +31,12 @@ describe('countryFlags helper', () => {
   });
 
   it('detects country names in proxy names', () => {
-    expect(formatProxyDisplayName('server-finland-01')).toBe('🇫🇮 server-finland-01');
-    expect(formatProxyDisplayName('vpn-германия-fast')).toBe('🇩🇪 vpn-германия-fast');
+    expect(formatProxyDisplayName('server-finland-01')).toBe(
+      '🇫🇮 server-finland-01',
+    );
+    expect(formatProxyDisplayName('vpn-германия-fast')).toBe(
+      '🇩🇪 vpn-германия-fast',
+    );
   });
 
   it('preserves names that already have flag emojis', () => {
