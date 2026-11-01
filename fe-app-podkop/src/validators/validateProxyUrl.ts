@@ -39,7 +39,7 @@ export function validateProxyUrl(url: string): ValidationResult {
 
   // UCI list values are consumed as whitespace-separated words by the shell
   // backend, so local subscription files must have an absolute path without spaces.
-  if (trimmedUrl.startsWith('/') && !/[\s\u0000-\u001f]/.test(trimmedUrl)) {
+  if (trimmedUrl.startsWith('/') && !/\s/.test(trimmedUrl)) {
     return { valid: true, message: _('Valid') };
   }
 

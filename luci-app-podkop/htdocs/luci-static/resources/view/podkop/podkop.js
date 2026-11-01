@@ -19,6 +19,7 @@
 
 // Diagnostic content
 "require view.podkop.diagnostic as diagnostic";
+"require view.podkop.monitoring as monitoring";
 
 function enableRowDragAndDrop(containerNode) {
   if (!containerNode) return;
@@ -93,23 +94,31 @@ function enableRowDragAndDrop(containerNode) {
         const dragged = window._podkopDraggedRow;
         if (!dragged || dragged === row) return;
 
+        const draggedSid = dragged.getAttribute("data-sid");
+        const targetSid = row.getAttribute("data-sid");
+        if (!draggedSid || !targetSid) return;
+
         const rect = row.getBoundingClientRect();
         const offset = e.clientY - rect.top;
 
         if (offset < rect.height / 2) {
           tbody.insertBefore(dragged, row);
+          if (typeof uci !== "undefined" && typeof uci.move === "function") {
+            uci.move("podkop", draggedSid, targetSid);
+            if (typeof uci.save === "function") {
+              uci.save();
+            }
+          }
         } else {
           tbody.insertBefore(dragged, row.nextSibling);
-        }
-
-        const newOrder = [];
-        tbody.querySelectorAll(".cbi-section-table-row").forEach((r) => {
-          const sid = r.getAttribute("data-sid");
-          if (sid) newOrder.push(sid);
-        });
-
-        if (newOrder.length > 0 && typeof uci !== "undefined") {
-          uci.reorder("podkop", newOrder);
+          const nextTargetSid =
+            row.nextElementSibling?.getAttribute("data-sid") || null;
+          if (typeof uci !== "undefined" && typeof uci.move === "function") {
+            uci.move("podkop", draggedSid, nextTargetSid);
+            if (typeof uci.save === "function") {
+              uci.save();
+            }
+          }
         }
 
         const formEl =
@@ -212,6 +221,12 @@ const EntryPoint = {
     // Render dashboard content
     dashboard.createDashboardContent(dashboardSection);
 
+    const monitoringSection = podkopMap.section(form.TypedSection, "monitoring", _("Monitoring"));
+    monitoringSection.anonymous = true;
+    monitoringSection.addremove = false;
+    monitoringSection.cfgsections = function () { return ["monitoring"]; };
+    monitoring.createMonitoringContent(monitoringSection);
+
     // Inject core service
     main.coreService();
 
@@ -222,9 +237,15 @@ const EntryPoint = {
 
   handleSaveApply(ev, mode) {
     return this.handleSave(ev).then(() => {
-      return ui.changes.apply(mode == "0").then(() => {
-        return fs.exec("/etc/init.d/podkop", ["restart"]).catch(() => {});
-      });
+      let restarted = false;
+      const doRestart = () => {
+        if (restarted) return;
+        restarted = true;
+        fs.exec_direct("/etc/init.d/podkop", ["restart"]).catch(() => {});
+      };
+      document.addEventListener("uci-applied", doRestart, { once: true });
+      setTimeout(doRestart, 4000);
+      ui.changes.apply(mode == "0");
     });
   },
 };

@@ -13,6 +13,19 @@ function validateIPV4(ip) {
   }
   return { valid: false, message: _("Invalid IP address") };
 }
+function validateIPV6(ip) {
+  const cleanIp = ip.startsWith("[") && ip.endsWith("]") ? ip.slice(1, -1) : ip;
+  const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
+  if (ipv6Regex.test(cleanIp)) {
+    return { valid: true, message: _("Valid") };
+  }
+  return { valid: false, message: _("Invalid IPv6 address") };
+}
+function validateIP(ip) {
+  const v4 = validateIPV4(ip);
+  if (v4.valid) return v4;
+  return validateIPV6(ip);
+}
 
 // src/validators/validateDomain.ts
 function validateDomain(domain, allowDotTLD = false) {
@@ -137,6 +150,28 @@ function bulkValidate(values, validate) {
   };
 }
 
+// src/validators/parseHostPort.ts
+function parseHostPort(hostPortPart) {
+  const trimmed = hostPortPart.trim();
+  if (trimmed.startsWith("[")) {
+    const bracketIndex = trimmed.indexOf("]");
+    if (bracketIndex !== -1) {
+      const host = trimmed.slice(1, bracketIndex);
+      const rest = trimmed.slice(bracketIndex + 1);
+      const port = rest.startsWith(":") ? rest.slice(1) : "";
+      return { host, port };
+    }
+  }
+  const lastColon = trimmed.lastIndexOf(":");
+  if (lastColon !== -1) {
+    return {
+      host: trimmed.slice(0, lastColon),
+      port: trimmed.slice(lastColon + 1)
+    };
+  }
+  return { host: trimmed, port: "" };
+}
+
 // src/validators/validateShadowsocksUrl.ts
 function validateShadowsocksUrl(url) {
   if (!url.startsWith("ss://")) {
@@ -187,14 +222,14 @@ function validateShadowsocksUrl(url) {
         message: _("Invalid Shadowsocks URL: missing server address")
       };
     }
-    const [server, portAndRest] = serverPart.split(":");
+    const hostPortOnly = serverPart.split(/[?#]/)[0];
+    const { host: server, port } = parseHostPort(hostPortOnly);
     if (!server) {
       return {
         valid: false,
         message: _("Invalid Shadowsocks URL: missing server")
       };
     }
-    const port = portAndRest ? portAndRest.split(/[?#]/)[0] : null;
     if (!port) {
       return {
         valid: false,
@@ -260,7 +295,7 @@ function validateVlessUrl(url) {
       return { valid: false, message: "Invalid VLESS URL: missing UUID" };
     if (!hostPortPart)
       return { valid: false, message: "Invalid VLESS URL: missing server" };
-    const [host, port] = hostPortPart.split(":");
+    const { host, port } = parseHostPort(hostPortPart);
     if (!host)
       return { valid: false, message: "Invalid VLESS URL: missing hostname" };
     if (!port)
@@ -365,7 +400,7 @@ function validateTrojanUrl(url) {
         valid: false,
         message: "Invalid Trojan URL: missing hostname and port"
       };
-    const [host, port] = hostPortPart.split(":");
+    const { host, port } = parseHostPort(hostPortPart);
     if (!host)
       return { valid: false, message: "Invalid Trojan URL: missing hostname" };
     if (!port)
@@ -415,7 +450,7 @@ function validateSocksUrl(url) {
         message: _("Invalid SOCKS URL: missing host and port")
       };
     }
-    const [host, port] = hostPortPart.split(":");
+    const { host, port } = parseHostPort(hostPortPart);
     if (!host) {
       return {
         valid: false,
@@ -432,9 +467,9 @@ function validateSocksUrl(url) {
         message: _("Invalid SOCKS URL: invalid port number")
       };
     }
-    const ipv4Result = validateIPV4(host);
+    const ipResult = validateIP(host);
     const domainResult = validateDomain(host);
-    if (!ipv4Result.valid && !domainResult.valid) {
+    if (!ipResult.valid && !domainResult.valid) {
       return {
         valid: false,
         message: _("Invalid SOCKS URL: invalid host format")
@@ -478,7 +513,7 @@ function validateHysteria2Url(url) {
         valid: false,
         message: _("Invalid HY2 URL: missing host & port")
       };
-    const [host, port] = hostPortPart.split(":");
+    const { host, port } = parseHostPort(hostPortPart);
     if (!host)
       return { valid: false, message: _("Invalid HY2 URL: missing host") };
     if (!port)
@@ -572,7 +607,7 @@ function validateProxyUrl(url) {
   if (trimmedUrl.startsWith("hysteria2://") || trimmedUrl.startsWith("hy2://")) {
     return validateHysteria2Url(trimmedUrl);
   }
-  if (trimmedUrl.startsWith("/") && !/[\s\u0000-\u001f]/.test(trimmedUrl)) {
+  if (trimmedUrl.startsWith("/") && !/\s/.test(trimmedUrl)) {
     return { valid: true, message: _("Valid") };
   }
   const engineScheme = trimmedUrl.match(/^([a-z][a-z0-9+.-]*):\/\//i)?.[1]?.toLowerCase();
@@ -666,6 +701,9 @@ var Podkop;
     AvailableClashAPIMethods2["GET_PROXY_LATENCY"] = "get_proxy_latency";
     AvailableClashAPIMethods2["GET_GROUP_LATENCY"] = "get_group_latency";
     AvailableClashAPIMethods2["SET_GROUP_PROXY"] = "set_group_proxy";
+    AvailableClashAPIMethods2["GET_CONNECTIONS"] = "get_connections";
+    AvailableClashAPIMethods2["CLOSE_CONNECTION"] = "close_connection";
+    AvailableClashAPIMethods2["CLOSE_CONNECTIONS"] = "close_connections";
   })(AvailableClashAPIMethods = Podkop2.AvailableClashAPIMethods || (Podkop2.AvailableClashAPIMethods = {}));
 })(Podkop || (Podkop = {}));
 
@@ -703,6 +741,9 @@ var PodkopShellMethods = {
     group,
     proxy
   ]),
+  getClashApiConnections: async () => callBaseMethod(Podkop.AvailableMethods.CLASH_API, [Podkop.AvailableClashAPIMethods.GET_CONNECTIONS]),
+  closeClashApiConnection: async (id) => callBaseMethod(Podkop.AvailableMethods.CLASH_API, [Podkop.AvailableClashAPIMethods.CLOSE_CONNECTION, id]),
+  closeClashApiConnections: async () => callBaseMethod(Podkop.AvailableMethods.CLASH_API, [Podkop.AvailableClashAPIMethods.CLOSE_CONNECTIONS]),
   restart: async () => callBaseMethod(
     Podkop.AvailableMethods.RESTART,
     [],
@@ -738,6 +779,9 @@ var PodkopShellMethods = {
 };
 
 // src/podkop/methods/custom/getDashboardSections.ts
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 async function getDashboardSections() {
   const configSections = await getConfigSections();
   const clashProxies = await PodkopShellMethods.getClashApiProxies();
@@ -801,7 +845,12 @@ async function getDashboardSections() {
         const outbound = proxies.find(
           (proxy) => proxy.code === `${section[".name"]}-out`
         );
-        const parsedOutbound = JSON.parse(section.outbound_json);
+        let parsedOutbound = null;
+        try {
+          parsedOutbound = section.outbound_json ? JSON.parse(section.outbound_json) : null;
+        } catch {
+          parsedOutbound = null;
+        }
         const parsedTag = parsedOutbound?.tag ? decodeURIComponent(parsedOutbound?.tag) : void 0;
         const proxyDisplayName = parsedTag || outbound?.value?.name || "";
         return {
@@ -831,7 +880,7 @@ async function getDashboardSections() {
             const item = proxies.find((p) => p.code === code);
             let displayName = "";
             const linkMatch = code.match(
-              new RegExp(`^${section[".name"]}-(\\d+)-out$`)
+              new RegExp(`^${escapeRegExp(section[".name"])}-(\\d+)-out$`)
             );
             if (linkMatch) {
               const linkIndex = parseInt(linkMatch[1], 10) - 1;
@@ -889,7 +938,9 @@ async function getDashboardSections() {
             const item = proxies.find((p) => p.code === code);
             let displayName = "";
             const linkMatch = code.match(
-              new RegExp(`^${section[".name"]}-(?:fallback-)?(\\d+)-out$`)
+              new RegExp(
+                `^${escapeRegExp(section[".name"])}-(?:fallback-)?(\\d+)-out$`
+              )
             );
             if (linkMatch && links[index]) {
               displayName = getProxyUrlName(links[index]);
@@ -976,12 +1027,104 @@ async function getSingBoxFeatures() {
   return success && Array.isArray(data) ? data : [];
 }
 
+// src/helpers/getClashApiUrl.ts
+function getWindowLocation() {
+  return typeof window !== "undefined" ? window.location : void 0;
+}
+function canUseDirectClashApi() {
+  const location = getWindowLocation();
+  return typeof location?.hostname === "string" && location.hostname !== "" && location.protocol !== "https:";
+}
+function getClashWsUrl() {
+  const { hostname } = window.location;
+  return `ws://${hostname}:9090`;
+}
+function getClashSocketUrl(path, secret) {
+  return `${getClashWsUrl()}${path}?token=${encodeURIComponent(secret)}`;
+}
+function getClashApiUrl() {
+  const { hostname } = window.location;
+  return `http://${hostname}:9090`;
+}
+function getClashUIUrl() {
+  const { hostname } = window.location;
+  return `http://${hostname}:9090/ui`;
+}
+
+// src/podkop/methods/custom/clashApi.ts
+var directSuspended = false;
+function resetClashApiTransport() {
+  directSuspended = false;
+}
+async function getClashApiConnections() {
+  if (canUseDirectClashApi() && !directSuspended) {
+    try {
+      const secret = await getClashApiSecret().catch(() => "");
+      const headers = {};
+      if (secret) headers.Authorization = `Bearer ${secret}`;
+      const res = await fetch(`${getClashApiUrl()}/connections`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, data };
+      }
+    } catch {
+      directSuspended = true;
+    }
+  }
+  return PodkopShellMethods.getClashApiConnections();
+}
+async function closeClashApiConnection(id) {
+  if (canUseDirectClashApi() && !directSuspended) {
+    try {
+      const secret = await getClashApiSecret().catch(() => "");
+      const headers = {};
+      if (secret) headers.Authorization = `Bearer ${secret}`;
+      const res = await fetch(
+        `${getClashApiUrl()}/connections/${encodeURIComponent(id)}`,
+        {
+          method: "DELETE",
+          headers
+        }
+      );
+      if (res.ok || res.status === 204) {
+        return { success: true };
+      }
+    } catch {
+      directSuspended = true;
+    }
+  }
+  return PodkopShellMethods.closeClashApiConnection(id);
+}
+async function closeAllClashApiConnections() {
+  if (canUseDirectClashApi() && !directSuspended) {
+    try {
+      const secret = await getClashApiSecret().catch(() => "");
+      const headers = {};
+      if (secret) headers.Authorization = `Bearer ${secret}`;
+      const res = await fetch(`${getClashApiUrl()}/connections`, {
+        method: "DELETE",
+        headers
+      });
+      if (res.ok || res.status === 204) {
+        return { success: true };
+      }
+    } catch {
+      directSuspended = true;
+    }
+  }
+  return PodkopShellMethods.closeAllClashApiConnections();
+}
+
 // src/podkop/methods/custom/index.ts
 var CustomPodkopMethods = {
   getConfigSections,
   getDashboardSections,
   getClashApiSecret,
-  getSingBoxFeatures
+  getSingBoxFeatures,
+  getClashApiConnections,
+  closeClashApiConnection,
+  closeAllClashApiConnections,
+  resetClashApiTransport
 };
 
 // src/constants.ts
@@ -1519,8 +1662,8 @@ var initialStore = {
 var store = new StoreService(initialStore);
 
 // src/helpers/downloadAsTxt.ts
-function downloadAsTxt(text, filename) {
-  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+function downloadAsTxt(text2, filename) {
+  const blob = new Blob([text2], { type: "text/plain;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   const safeName = filename.endsWith(".txt") ? filename : `${filename}.txt`;
@@ -3472,6 +3615,37 @@ function renderSearchIcon24() {
   );
 }
 
+// src/helpers/svgEl.ts
+function svgEl(tag, attrs = {}, children = []) {
+  const NS = "http://www.w3.org/2000/svg";
+  const el = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v != null) el.setAttribute(k, String(v));
+  }
+  (Array.isArray(children) ? children : [children]).filter(Boolean).forEach((ch) => el.appendChild(ch));
+  return el;
+}
+
+// src/icons/renderChevronUpIcon24.ts
+function renderChevronUpIcon24() {
+  return svgEl(
+    "svg",
+    {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "24",
+      height: "24",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      "stroke-width": "2",
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round",
+      class: "lucide lucide-chevron-up-icon lucide-chevron-up"
+    },
+    [svgEl("path", { d: "m18 15-6-6-6 6" })]
+  );
+}
+
 // src/icons/renderBookOpenTextIcon24.ts
 function renderBookOpenTextIcon24() {
   const NS = "http://www.w3.org/2000/svg";
@@ -3504,17 +3678,17 @@ function renderBookOpenTextIcon24() {
 function renderButton({
   classNames = [],
   disabled,
-  loading,
+  loading: loading2,
   onClick,
-  text,
+  text: text2,
   icon
 }) {
-  const hasIcon = !!loading || !!icon;
+  const hasIcon = !!loading2 || !!icon;
   function getWrappedIcon() {
     const iconWrap = E("span", {
       class: "pdk-partial-button__icon"
     });
-    if (loading) {
+    if (loading2) {
       iconWrap.appendChild(renderLoaderCircleIcon24());
       return iconWrap;
     }
@@ -3529,13 +3703,13 @@ function renderButton({
       "btn",
       "pdk-partial-button",
       ...insertIf(Boolean(disabled), ["pdk-partial-button--disabled"]),
-      ...insertIf(Boolean(loading), ["pdk-partial-button--loading"]),
+      ...insertIf(Boolean(loading2), ["pdk-partial-button--loading"]),
       ...insertIf(Boolean(hasIcon), ["pdk-partial-button--with-icon"]),
       ...classNames
     ].filter(Boolean).join(" ");
   }
   function getDisabled() {
-    if (loading || disabled) {
+    if (loading2 || disabled) {
       return true;
     }
     return void 0;
@@ -3543,7 +3717,7 @@ function renderButton({
   return E(
     "button",
     { class: getClass(), disabled: getDisabled(), click: onClick },
-    [...insertIf(hasIcon, [getWrappedIcon()]), E("span", {}, text)]
+    [...insertIf(hasIcon, [getWrappedIcon()]), E("span", {}, text2)]
   );
 }
 
@@ -3567,9 +3741,9 @@ function showToast(message, type, duration = 3e3) {
 }
 
 // src/helpers/copyToClipboard.ts
-function copyToClipboard(text) {
+function copyToClipboard(text2) {
   const textarea = document.createElement("textarea");
-  textarea.value = text;
+  textarea.value = text2;
   document.body.appendChild(textarea);
   textarea.select();
   try {
@@ -3583,23 +3757,23 @@ function copyToClipboard(text) {
 }
 
 // src/partials/modal/renderModal.ts
-function renderModal(text, name) {
+function renderModal(text2, name) {
   return E(
     "div",
     { class: "pdk-partial-modal__body" },
     E("div", {}, [
-      E("pre", { class: "pdk-partial-modal__content" }, E("code", {}, text)),
+      E("pre", { class: "pdk-partial-modal__content" }, E("code", {}, text2)),
       E("div", { class: "pdk-partial-modal__footer" }, [
         renderButton({
           classNames: ["cbi-button-apply"],
           text: _("Download"),
-          onClick: () => downloadAsTxt(text, name)
+          onClick: () => downloadAsTxt(text2, name)
         }),
         renderButton({
           classNames: ["cbi-button-apply"],
           text: _("Copy"),
           onClick: () => copyToClipboard(` \`\`\`${name} 
- ${text}  
+ ${text2}  
  \`\`\``)
         }),
         renderButton({
@@ -3868,7 +4042,7 @@ function renderCheckSection(props) {
 
 // src/podkop/tabs/diagnostic/partials/renderRunAction.ts
 function renderRunAction({
-  loading,
+  loading: loading2,
   click
 }) {
   return E("div", { class: "pdk_diagnostic-page__run_check_wrapper" }, [
@@ -3876,7 +4050,7 @@ function renderRunAction({
       text: _("Run Diagnostic"),
       onClick: click,
       icon: renderSearchIcon24,
-      loading,
+      loading: loading2,
       classNames: ["cbi-button-apply"]
     })
   ]);
@@ -4067,14 +4241,14 @@ function isUnknownVersion(version) {
   return version === "unknown" || version === _("unknown");
 }
 function getPodkopVersionRow(diagnosticsSystemInfo) {
-  const loading = diagnosticsSystemInfo.loading;
+  const loading2 = diagnosticsSystemInfo.loading;
   const unknown = isUnknownVersion(diagnosticsSystemInfo.podkop_version);
   const hasActualVersion = Boolean(diagnosticsSystemInfo.podkop_latest_version) && !isUnknownVersion(diagnosticsSystemInfo.podkop_latest_version);
   const version = normalizeCompiledVersion(
     diagnosticsSystemInfo.podkop_version
   );
   const isDevVersion = version === "dev";
-  if (loading || unknown || !hasActualVersion || isDevVersion) {
+  if (loading2 || unknown || !hasActualVersion || isDevVersion) {
     return {
       key: "Podkop",
       value: version
@@ -4137,10 +4311,10 @@ function renderDiagnosticsChecks() {
 }
 function renderDiagnosticRunActionWidget() {
   logger.debug("[DIAGNOSTIC]", "renderDiagnosticRunActionWidget");
-  const { loading } = store.get().diagnosticsRunAction;
+  const { loading: loading2 } = store.get().diagnosticsRunAction;
   const container = document.getElementById("pdk_diagnostic-page-run-check");
   const renderedAction = renderRunAction({
-    loading,
+    loading: loading2,
     click: () => runChecks()
   });
   return preserveScrollForPage(() => {
@@ -4758,10 +4932,1969 @@ var DiagnosticTab = {
   styles: styles4
 };
 
+// src/helpers/element.ts
+function element(...args) {
+  if (args.length >= 3 && (typeof args[2] === "string" || typeof args[2] === "number")) {
+    args[2] = [String(args[2])];
+  }
+  return E(...args);
+}
+var textE = element;
+
+// src/podkop/tabs/monitoring/render.ts
+function render3() {
+  return textE(
+    "div",
+    {
+      id: "monitoring-status",
+      class: "fkp_monitoring-page"
+    },
+    [
+      textE("div", { class: "fkp_monitoring-page__panel" }, [
+        textE("div", { class: "fkp_monitoring-page__controls" }, [
+          textE("div", { class: "fkp_monitoring-page__filters" }, [
+            textE(
+              "select",
+              {
+                id: "monitoring-device-filter",
+                class: "cbi-input-select"
+              },
+              [textE("option", { value: "" }, _("All devices"))]
+            ),
+            textE(
+              "select",
+              {
+                id: "monitoring-route-filter",
+                class: "cbi-input-select"
+              },
+              [textE("option", { value: "" }, _("All routes"))]
+            ),
+            textE("label", { class: "fkp_monitoring-page__search" }, [
+              textE("span", { class: "fkp_monitoring-page__search-icon" }, []),
+              textE("input", {
+                id: "monitoring-search",
+                class: "cbi-input-text fkp_monitoring-page__search-input",
+                type: "search",
+                placeholder: _("Search"),
+                autocomplete: "off"
+              })
+            ])
+          ]),
+          textE("div", { class: "fkp_monitoring-page__actions" }, [
+            textE("label", { class: "fkp_monitoring-page__checkbox" }, [
+              textE("input", {
+                id: "monitoring-auto-refresh",
+                class: "cbi-input-checkbox",
+                type: "checkbox",
+                checked: true
+              }),
+              textE("span", {}, _("Auto refresh"))
+            ]),
+            textE(
+              "button",
+              {
+                id: "monitoring-close-all",
+                class: "btn cbi-button cbi-button-negative fkp_monitoring-page__action",
+                title: _("Close all connections"),
+                type: "button",
+                disabled: true
+              },
+              _("Close all")
+            )
+          ])
+        ]),
+        textE("ul", { class: "cbi-tabmenu fkp_monitoring-page__tabs" }, [
+          textE("li", { id: "monitoring-tab-active", class: "cbi-tab" }, [
+            textE("a", { href: "#" }, _("Active"))
+          ]),
+          textE("li", { id: "monitoring-tab-closed", class: "cbi-tab-disabled" }, [
+            textE("a", { href: "#" }, _("Closed"))
+          ]),
+          textE(
+            "span",
+            {
+              id: "monitoring-pause-note",
+              class: "fkp_monitoring-page__pause-note",
+              role: "status",
+              title: _("Paused while text is selected"),
+              hidden: true
+            },
+            _("Paused while text is selected")
+          )
+        ]),
+        textE(
+          "div",
+          { id: "monitoring-connections", class: "fkp_monitoring-page__body" },
+          [
+            textE(
+              "div",
+              {
+                class: "fkp_monitoring-page__state fkp_monitoring-page__state--loading"
+              },
+              _("Loading connections...")
+            )
+          ]
+        )
+      ])
+    ]
+  );
+}
+
+// src/helpers/onMount.ts
+async function onMount(id) {
+  return new Promise((resolve) => {
+    const el = document.getElementById(id);
+    if (el && el.offsetParent !== null) {
+      return resolve(el);
+    }
+    const observer = new MutationObserver(() => {
+      const target = document.getElementById(id);
+      if (target) {
+        const io = new IntersectionObserver((entries) => {
+          const visible = entries.some((e) => e.isIntersecting);
+          if (visible) {
+            observer.disconnect();
+            io.disconnect();
+            resolve(target);
+          }
+        });
+        io.observe(target);
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  });
+}
+
+// src/helpers/pollDelay.ts
+var POLL_DUTY_FACTOR = 8;
+function pollDelayForDuration(baseIntervalMs, durationMs, maxIntervalMs) {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
+    return baseIntervalMs;
+  }
+  return Math.min(
+    Math.max(baseIntervalMs, Math.round(durationMs * POLL_DUTY_FACTOR)),
+    maxIntervalMs
+  );
+}
+
+// src/podkop/tabs/monitoring/valueCopy.ts
+function compactMonitoringText(value) {
+  return value.replace(/\u2026/g, "").trim().replace(/\s+/g, "");
+}
+function shouldCopyFullMonitoringValue(element2, selectedText, fullText) {
+  const selected = selectedText.replace(/\u2026/g, "").trim();
+  const full = fullText.trim();
+  if (!selected || !full) {
+    return false;
+  }
+  if (selected === full) {
+    return true;
+  }
+  if (element2.scrollWidth <= element2.clientWidth + 1) {
+    return false;
+  }
+  const compactSelected = compactMonitoringText(selectedText);
+  const compactFull = compactMonitoringText(fullText);
+  if (!compactFull.startsWith(compactSelected)) {
+    return false;
+  }
+  const visibleChars = Math.floor(
+    element2.clientWidth / Math.max(element2.scrollWidth, 1) * compactFull.length
+  );
+  return compactSelected.length >= Math.max(4, visibleChars - 2);
+}
+
+// src/helpers/isDocumentVisible.ts
+function isDocumentVisible() {
+  return typeof document === "undefined" || !document.visibilityState || document.visibilityState === "visible";
+}
+function whenDocumentVisible(callback) {
+  if (isDocumentVisible()) {
+    callback();
+    return;
+  }
+  const onChange = () => {
+    if (!isDocumentVisible()) {
+      return;
+    }
+    document.removeEventListener("visibilitychange", onChange);
+    callback();
+  };
+  document.addEventListener("visibilitychange", onChange);
+}
+
+// src/helpers/pollChain.ts
+function createPollChain(run, nextDelay) {
+  let generation = 0;
+  let active = false;
+  let running = false;
+  let timer = null;
+  const request = (current) => {
+    if (current !== generation || running) {
+      return;
+    }
+    running = true;
+    void Promise.resolve().then(run).catch(() => void 0).finally(() => {
+      running = false;
+      if (current === generation) {
+        schedule(nextDelay(), current);
+      }
+    });
+  };
+  const schedule = (delay, current) => {
+    timer = setTimeout(() => {
+      timer = null;
+      whenDocumentVisible(() => request(current));
+    }, delay);
+  };
+  const clearTimer = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+  return {
+    get active() {
+      return active;
+    },
+    start(delay) {
+      if (active) {
+        return;
+      }
+      active = true;
+      generation += 1;
+      schedule(delay, generation);
+    },
+    stop() {
+      active = false;
+      generation += 1;
+      running = false;
+      clearTimer();
+    },
+    now() {
+      if (!active || running) {
+        return;
+      }
+      clearTimer();
+      schedule(0, generation);
+    }
+  };
+}
+
+// src/helpers/tabLifecycle.ts
+var TAB_HIDDEN_GRACE_MS = 1e4;
+function createTabLifecycle(options) {
+  const graceMs = options.graceMs ?? TAB_HIDDEN_GRACE_MS;
+  let running = false;
+  let stopTimer = null;
+  const cancelStop = () => {
+    if (stopTimer) {
+      clearTimeout(stopTimer);
+      stopTimer = null;
+    }
+  };
+  return {
+    update() {
+      if (options.shown()) {
+        cancelStop();
+        if (!running) {
+          running = true;
+          options.start();
+        }
+        return;
+      }
+      if (!running || stopTimer) {
+        return;
+      }
+      stopTimer = setTimeout(() => {
+        stopTimer = null;
+        if (!options.shown()) {
+          running = false;
+          options.stop();
+        }
+      }, graceMs);
+    }
+  };
+}
+
+// src/helpers/localDevices.ts
+var callHostHints;
+var callDHCPLeases;
+var callNetworkInterfaceDump;
+try {
+  if (typeof rpc !== "undefined" && typeof rpc.declare === "function") {
+    callHostHints = rpc.declare({
+      object: "luci-rpc",
+      method: "getHostHints",
+      expect: { "": {} }
+    });
+    callDHCPLeases = rpc.declare({
+      object: "luci-rpc",
+      method: "getDHCPLeases",
+      expect: { "": {} }
+    });
+    callNetworkInterfaceDump = rpc.declare({
+      object: "network.interface",
+      method: "dump",
+      expect: { interface: [] }
+    });
+  }
+} catch {
+}
+var localDevicesCache = null;
+var localDevicesPromise = null;
+function normalizeName(name) {
+  return `${name || ""}`.trim().replace(/\.lan$/i, "");
+}
+function loadLocalDevices() {
+  if (localDevicesCache) {
+    return Promise.resolve(localDevicesCache);
+  }
+  if (localDevicesPromise) {
+    return localDevicesPromise;
+  }
+  const hostHintsPromise = typeof callHostHints === "function" ? callHostHints().catch(() => ({})) : Promise.resolve({});
+  const dhcpLeasesPromise = typeof callDHCPLeases === "function" ? callDHCPLeases().catch(() => ({})) : Promise.resolve({});
+  const networkDumpPromise = typeof callNetworkInterfaceDump === "function" ? callNetworkInterfaceDump().catch(() => ({})) : Promise.resolve({});
+  const uciDhcpPromise = typeof uci !== "undefined" && typeof uci.load === "function" ? uci.load("dhcp").then(() => uci.sections("dhcp", "host")).catch(() => []) : Promise.resolve([]);
+  localDevicesPromise = Promise.all([
+    hostHintsPromise,
+    dhcpLeasesPromise,
+    networkDumpPromise,
+    uciDhcpPromise
+  ]).then(([hostHints, dhcpLeases, _networkInterfaces, staticHosts]) => {
+    const names = {};
+    if (hostHints && typeof hostHints === "object") {
+      Object.values(hostHints).forEach((hint) => {
+        if (!hint || typeof hint !== "object") return;
+        const name = normalizeName(hint.name);
+        if (!name) return;
+        const ipaddrs = Array.isArray(hint.ipaddrs) ? hint.ipaddrs : [];
+        ipaddrs.forEach((ip) => {
+          if (ip && validateIP(ip).valid) names[ip] = name;
+        });
+      });
+    }
+    if (dhcpLeases && typeof dhcpLeases === "object" && Array.isArray(dhcpLeases.dhcp_leases)) {
+      dhcpLeases.dhcp_leases.forEach((lease) => {
+        if (!lease || typeof lease !== "object") return;
+        const name = normalizeName(lease.hostname);
+        const ip = `${lease.ipaddr || ""}`.trim();
+        if (ip && name && validateIP(ip).valid) names[ip] = name;
+      });
+    }
+    if (Array.isArray(staticHosts)) {
+      staticHosts.forEach((host) => {
+        if (!host || typeof host !== "object") return;
+        const name = normalizeName(host.name);
+        const ip = `${host.ip || ""}`.trim();
+        if (ip && name && validateIP(ip).valid) names[ip] = name;
+      });
+    }
+    localDevicesCache = { names };
+    return localDevicesCache;
+  }).catch(() => ({ names: {} })).finally(() => {
+    localDevicesPromise = null;
+  });
+  return localDevicesPromise;
+}
+
+// src/podkop/tabs/monitoring/source.ts
+var SYSTEM_SOURCE_KEY = "@system";
+var SYSTEM_INBOUND_TAGS = /* @__PURE__ */ new Set(["system-in", "system6-in"]);
+var KIND_ORDER = ["system", "device", "server"];
+var collator = new Intl.Collator(void 0, {
+  numeric: true,
+  sensitivity: "base"
+});
+function text(value) {
+  return value == null ? "" : String(value).trim();
+}
+function isLoopback(ip) {
+  return ip === "::1" || /^(::ffff:)?127\./.test(ip);
+}
+function connectionInboundTag(connection) {
+  const type = text(connection.metadata?.type);
+  const tag = text(type.split("/").slice(1).join("/") || type);
+  if (tag) {
+    return tag;
+  }
+  return text(text(connection.rule).match(/(?:^|\s)inbound=([^\s]+)/)?.[1]);
+}
+function sourceLabel(name, detail) {
+  return [name, detail].filter(Boolean).join(" \xB7 ");
+}
+function describeSource(connection, names) {
+  const ip = text(connection.metadata?.sourceIP);
+  const tag = connectionInboundTag(connection);
+  const search = (...values) => [...values, ip, tag].filter(Boolean).join(" ");
+  if (SYSTEM_INBOUND_TAGS.has(tag) || !names.servers.has(tag) && isLoopback(ip)) {
+    const name2 = _("System");
+    return {
+      key: SYSTEM_SOURCE_KEY,
+      kind: "system",
+      name: name2,
+      detail: "",
+      server: "",
+      search: search(name2)
+    };
+  }
+  if (names.servers.has(tag)) {
+    const user = text(connection.metadata?.user);
+    const byAddress = user ? "" : text(names.clients[tag]?.[ip]);
+    const name2 = text(names.clients[tag]?.[user]) || user || byAddress || tag;
+    const detail = user || byAddress ? tag : ip;
+    return {
+      key: JSON.stringify([tag, user, user ? "" : ip]),
+      kind: "server",
+      name: name2,
+      detail,
+      server: tag,
+      search: search(sourceLabel(name2, detail))
+    };
+  }
+  const name = text(names.devices[ip]);
+  return {
+    key: ip,
+    kind: "device",
+    name,
+    detail: ip,
+    server: "",
+    search: search(name)
+  };
+}
+function compareSources(a, b) {
+  return KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || collator.compare(a.server, b.server) || Number(!a.name) - Number(!b.name) || collator.compare(a.name, b.name) || collator.compare(a.detail, b.detail) || a.key.localeCompare(b.key);
+}
+
+// src/podkop/tabs/monitoring/connectionList.ts
+function renderList(rows, { closable, sort }) {
+  return textE(
+    "div",
+    {
+      class: [
+        "fkp_monitoring-page__list",
+        closable ? "fkp_monitoring-page__list--closable" : ""
+      ].filter(Boolean).join(" "),
+      role: "table"
+    },
+    [
+      textE(
+        "div",
+        {
+          class: "fkp_monitoring-page__row fkp_monitoring-page__row--head",
+          role: "row"
+        },
+        [
+          renderHeading("host", _("Host")),
+          renderHeading("source", _("Source")),
+          renderHeading("route", _("Route")),
+          renderHeading("network", _("Type")),
+          renderSortHeading("time", _("Time"), sort),
+          renderSortHeading("download", `\u2193 ${_("Downloaded")}`, sort),
+          renderSortHeading("upload", `\u2191 ${_("Uploaded")}`, sort),
+          ...closable ? [
+            textE("div", {
+              class: cellClass("action"),
+              role: "columnheader",
+              "aria-label": _("Close")
+            })
+          ] : []
+        ]
+      ),
+      ...rows
+    ]
+  );
+}
+function cellClass(column) {
+  return `fkp_monitoring-page__cell fkp_monitoring-page__cell--${column}`;
+}
+function renderHeading(column, text2) {
+  return textE("div", { class: cellClass(column), role: "columnheader" }, text2);
+}
+function renderSortHeading(column, text2, sort) {
+  const order = sort?.column === column ? sort.descending ? "descending" : "ascending" : "none";
+  return textE(
+    "div",
+    {
+      class: [cellClass(column), "fkp_monitoring-page__cell--sortable"].join(
+        " "
+      ),
+      role: "columnheader",
+      "aria-sort": order
+    },
+    [
+      textE(
+        "button",
+        { class: "fkp_monitoring-page__sort", type: "button", value: column },
+        [
+          textE("span", { class: "fkp_monitoring-page__sort-label" }, text2),
+          textE(
+            "span",
+            { class: "fkp_monitoring-page__sort-icon", "aria-hidden": "true" },
+            [renderChevronUpIcon24()]
+          )
+        ]
+      )
+    ]
+  );
+}
+function renderValue(text2, className, fullValue = text2) {
+  return textE(
+    "span",
+    {
+      class: ["fkp_monitoring-page__value", className].filter(Boolean).join(" "),
+      "data-copy-value": fullValue
+    },
+    text2
+  );
+}
+function renderSource(item) {
+  const label = sourceLabel(item.sourceName, item.sourceDetail);
+  if (item.system) {
+    return renderValue(
+      item.sourceName,
+      "fkp_monitoring-page__value fkp_monitoring-page__tag fkp_monitoring-page__tag--builtin",
+      label
+    );
+  }
+  const detail = item.sourceDetail && textE("span", { class: "fkp_monitoring-page__muted" }, item.sourceDetail);
+  return renderValue(
+    [item.sourceName, detail ? " " : "", detail].filter(Boolean),
+    "fkp_monitoring-page__value",
+    label
+  );
+}
+function renderRoute(route, direct) {
+  return direct ? renderValue(
+    route,
+    "fkp_monitoring-page__tag fkp_monitoring-page__tag--builtin"
+  ) : renderValue(route, "fkp_monitoring-page__tag");
+}
+function renderRowAction(id) {
+  return textE(
+    "button",
+    {
+      class: "btn cbi-button fkp_monitoring-page__row-action",
+      title: _("Close connection"),
+      "aria-label": _("Close connection"),
+      type: "button",
+      value: id
+    },
+    [renderXIcon24()]
+  );
+}
+function renderRow(item, closable) {
+  return textE(
+    "div",
+    {
+      class: [
+        "fkp_monitoring-page__row",
+        item.closing ? "fkp_monitoring-page__row--closing" : ""
+      ].filter(Boolean).join(" "),
+      role: "row",
+      "data-connection-id": item.id
+    },
+    [
+      textE("div", { class: cellClass("host"), role: "cell" }, [
+        renderValue(item.host, "fkp_monitoring-page__host")
+      ]),
+      textE("div", { class: cellClass("source"), role: "cell" }, [
+        renderSource(item)
+      ]),
+      textE("div", { class: cellClass("route"), role: "cell" }, [
+        renderRoute(item.route, item.direct)
+      ]),
+      textE("div", { class: cellClass("network"), role: "cell" }, [
+        renderValue(item.network, "fkp_monitoring-page__network")
+      ]),
+      textE("div", { class: cellClass("time"), role: "cell" }, [
+        renderValue(item.time, "fkp_monitoring-page__metric")
+      ]),
+      textE("div", { class: cellClass("download"), role: "cell" }, [
+        renderValue(item.download, "fkp_monitoring-page__metric")
+      ]),
+      textE("div", { class: cellClass("upload"), role: "cell" }, [
+        renderValue(item.upload, "fkp_monitoring-page__metric")
+      ]),
+      ...closable ? [
+        textE("div", { class: cellClass("action"), role: "cell" }, [
+          renderRowAction(item.id)
+        ])
+      ] : []
+    ]
+  );
+}
+function renderConnectionList(items, options) {
+  return renderList(
+    items.map((item) => renderRow(item, options.closable)),
+    options
+  );
+}
+function renderConnectionListState(message, options) {
+  return renderList(
+    [
+      textE(
+        "div",
+        {
+          class: "fkp_monitoring-page__row fkp_monitoring-page__row--state",
+          role: "row"
+        },
+        [
+          textE(
+            "div",
+            {
+              class: [cellClass("state"), "fkp_monitoring-page__cell--span"].join(
+                " "
+              ),
+              role: "cell"
+            },
+            [
+              textE(
+                "div",
+                {
+                  class: ["fkp_monitoring-page__state", options.className].filter(Boolean).join(" ")
+                },
+                message
+              )
+            ]
+          )
+        ]
+      )
+    ],
+    options
+  );
+}
+
+// src/helpers/domainToUnicode.ts
+var BASE = 36;
+var T_MIN = 1;
+var T_MAX = 26;
+var SKEW = 38;
+var DAMP = 700;
+var INITIAL_BIAS = 72;
+var INITIAL_N = 128;
+var MAX_CODE_POINT = 1114111;
+function adapt(delta, points, first) {
+  let scaled = first ? Math.floor(delta / DAMP) : Math.floor(delta / 2);
+  scaled += Math.floor(scaled / points);
+  let k = 0;
+  while (scaled > (BASE - T_MIN) * T_MAX / 2) {
+    scaled = Math.floor(scaled / (BASE - T_MIN));
+    k += BASE;
+  }
+  return k + Math.floor((BASE - T_MIN + 1) * scaled / (scaled + SKEW));
+}
+function digitValue(code) {
+  if (code >= 48 && code <= 57) {
+    return code - 48 + 26;
+  }
+  if (code >= 97 && code <= 122) {
+    return code - 97;
+  }
+  return BASE;
+}
+function decodeLabel(encoded) {
+  const delimiter = encoded.lastIndexOf("-");
+  const output = [];
+  for (let index2 = 0; index2 < Math.max(delimiter, 0); index2 += 1) {
+    output.push(encoded.charCodeAt(index2));
+  }
+  let n = INITIAL_N;
+  let i = 0;
+  let bias = INITIAL_BIAS;
+  let index = delimiter > 0 ? delimiter + 1 : 0;
+  while (index < encoded.length) {
+    const previous = i;
+    let weight = 1;
+    for (let k = BASE; ; k += BASE) {
+      if (index >= encoded.length) {
+        return null;
+      }
+      const digit = digitValue(encoded.charCodeAt(index));
+      index += 1;
+      if (digit >= BASE) {
+        return null;
+      }
+      i += digit * weight;
+      const threshold = k <= bias ? T_MIN : k >= bias + T_MAX ? T_MAX : k - bias;
+      if (digit < threshold) {
+        break;
+      }
+      weight *= BASE - threshold;
+    }
+    bias = adapt(i - previous, output.length + 1, previous === 0);
+    n += Math.floor(i / (output.length + 1));
+    i %= output.length + 1;
+    if (n > MAX_CODE_POINT || n >= 55296 && n <= 57343) {
+      return null;
+    }
+    output.splice(i, 0, n);
+    i += 1;
+  }
+  return output.length ? String.fromCodePoint(...output) : null;
+}
+function mixesLatin(label) {
+  return /\p{Script=Latin}/u.test(label) && /(?!\p{Script=Latin})\p{L}/u.test(label);
+}
+function domainToUnicode(domain) {
+  return domain.split(".").map((label) => {
+    if (!/^xn--/i.test(label)) {
+      return label;
+    }
+    const decoded = decodeLabel(label.slice(4).toLowerCase());
+    return decoded && !mixesLatin(decoded) ? decoded : label;
+  }).join(".");
+}
+
+// src/podkop/tabs/monitoring/endpoint.ts
+var WEB_PORTS = /* @__PURE__ */ new Set(["80", "443"]);
+function normalize(value) {
+  return value == null ? "" : String(value).trim();
+}
+function formatEndpoint(address, port) {
+  const normalizedAddress = domainToUnicode(normalize(address));
+  const normalizedPort = normalize(port);
+  if (!normalizedAddress) {
+    return "-";
+  }
+  if (!normalizedPort || WEB_PORTS.has(normalizedPort)) {
+    return normalizedAddress;
+  }
+  if (normalizedAddress.includes(":") && !normalizedAddress.startsWith("[")) {
+    return `[${normalizedAddress}]:${normalizedPort}`;
+  }
+  return `${normalizedAddress}:${normalizedPort}`;
+}
+
+// src/podkop/tabs/monitoring/closeConnections.ts
+var PARALLEL_CLOSES = 4;
+async function closeConnections(ids, close) {
+  const closed = [];
+  const failed2 = [];
+  for (let start = 0; start < ids.length; start += PARALLEL_CLOSES) {
+    const batch = ids.slice(start, start + PARALLEL_CLOSES);
+    const results = await Promise.all(
+      batch.map((id) => close(id).catch(() => null))
+    );
+    results.forEach((result, index) => {
+      if (result?.success) {
+        closed.push(batch[index]);
+      } else {
+        failed2.push(batch[index]);
+      }
+    });
+  }
+  return { closed, failed: failed2 };
+}
+
+// src/podkop/tabs/monitoring/initController.ts
+function normalizeConnectionsPayload(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value;
+}
+var RENDER_INTERVAL_MS = 500;
+var CONNECTIONS_RPC_POLL_INTERVAL_MS = 1500;
+var CONNECTIONS_RPC_POLL_BACKOFF_MAX_MS = 3e4;
+var CONNECTIONS_POLL_DUTY_MAX_MS = 15e3;
+var CONNECTIONS_SOCKET_GRACE_MS = 2e3;
+var CLOSED_CONNECTION_LIMIT = 300;
+var ALL_FILTER_VALUE = "";
+var DIRECT_ROUTE_TAG = "direct-out";
+var monitoringMounted = false;
+var monitoringMountId = 0;
+var monitoringLifecycleRegistered = false;
+var monitoringControllerInitialized = false;
+var renderTimer = null;
+var connectionsSocketUrl = "";
+var connectionsUpdatesId = 0;
+var connectionsSocketGraceTimer = null;
+var lastConnectionsPollDurationMs = 0;
+var pendingConnectionsPayload = null;
+var activeTab = "active";
+var selectedDeviceFilter = ALL_FILTER_VALUE;
+var selectedRouteFilter = ALL_FILTER_VALUE;
+var searchQuery = "";
+var connectionSort = null;
+var localDeviceNames = {};
+var routeLabels = {};
+var sectionTags = [];
+var sectionTagsLongestFirst = [];
+var serverInboundTags = /* @__PURE__ */ new Set();
+var serverClientNames = {};
+var filterSignatures = {};
+var loading = true;
+var failed = false;
+var closingAll = false;
+var monitoringPaused = false;
+var selectionHeld = false;
+var monitoringPausedAt = null;
+var consecutivePollFailures = 0;
+var activeConnections = /* @__PURE__ */ new Map();
+var closedConnections = /* @__PURE__ */ new Map();
+var closingConnectionIds = /* @__PURE__ */ new Set();
+function normalizeString(value) {
+  return value == null ? "" : String(value).trim();
+}
+function getDisplayName(section) {
+  return normalizeString(section.label) || section[".name"];
+}
+function buildRouteDisplayNames(sections) {
+  const labels = {
+    [DIRECT_ROUTE_TAG]: _("Direct"),
+    direct: _("Direct"),
+    block: _("Block"),
+    exclusion: _("Exclusion")
+  };
+  const routeSectionTags = [];
+  sections.filter((section) => section[".type"] === "section").filter((section) => section.enabled !== "0").forEach((section) => {
+    const sectionName = section[".name"];
+    const displayName = getDisplayName(section);
+    if (!sectionName || !displayName) return;
+    routeSectionTags.push(displayName);
+    labels[displayName] = displayName;
+    labels[sectionName] = displayName;
+    labels[`${sectionName}-out`] = displayName;
+  });
+  routeLabels = labels;
+  sectionTags = routeSectionTags;
+  sectionTagsLongestFirst = [...routeSectionTags].sort(
+    (a, b) => b.length - a.length
+  );
+}
+function getKnownRouteTag(tag) {
+  if (!tag || routeLabels[tag]) {
+    return tag;
+  }
+  return sectionTagsLongestFirst.find(
+    (sectionTag) => tag.startsWith(`${sectionTag}/`) || tag.startsWith(`${sectionTag}-`)
+  ) || "";
+}
+function getRouteTagFromRule(rule) {
+  const match = normalizeString(rule).match(/=>\s*route\(([^)]+)\)/);
+  return normalizeString(match?.[1]).replace(/^['"]|['"]$/g, "");
+}
+function parseStartedAt(connection) {
+  const startedAt = Date.parse(connection.start || "");
+  return Number.isFinite(startedAt) ? startedAt : connection.lastSeenAt;
+}
+function formatDuration(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1e3));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor(totalSeconds % 3600 / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (value) => String(value).padStart(2, "0");
+  if (hours > 0) {
+    return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${minutes}:${pad(seconds)}`;
+}
+function getConnectionDuration(connection, now) {
+  const finishedAt = connection.closedAt || monitoringPausedAt || now;
+  return finishedAt - parseStartedAt(connection);
+}
+function formatConnectionDuration(connection) {
+  return formatDuration(getConnectionDuration(connection, Date.now()));
+}
+function formatBytes(value) {
+  return prettyBytes(Number.isFinite(value) ? Number(value) : 0);
+}
+function getSource(connection) {
+  return describeSource(connection, {
+    devices: localDeviceNames,
+    servers: serverInboundTags,
+    clients: serverClientNames
+  });
+}
+function getTargetCellParts(connection) {
+  const metadata = connection.metadata || {};
+  const host = normalizeString(metadata.host);
+  const destinationIp = normalizeString(metadata.destinationIP);
+  const port = metadata.destinationPort;
+  const primaryTarget = host || destinationIp;
+  const primary = primaryTarget ? formatEndpoint(primaryTarget, port) : "-";
+  return {
+    primary,
+    searchValue: [primary, host, destinationIp].filter(Boolean).join(" ")
+  };
+}
+function getRoute(connection) {
+  const chains = Array.isArray(connection.chains) ? connection.chains : [];
+  const ruleTag = getRouteTagFromRule(connection.rule);
+  const tag = [...chains].reverse().map(getKnownRouteTag).find(Boolean) || getKnownRouteTag(ruleTag) || ruleTag;
+  return tag ? { tag, label: routeLabels[tag] || tag } : null;
+}
+function getNetwork(connection) {
+  return normalizeString(connection.metadata?.network).toLowerCase() || "-";
+}
+function sortConnections(connections, tab) {
+  return [...connections].sort((a, b) => {
+    if (tab === "closed") {
+      return (b.closedAt || 0) - (a.closedAt || 0);
+    }
+    return parseStartedAt(b) - parseStartedAt(a);
+  });
+}
+function getShownSort() {
+  return connectionSort ?? (activeTab === "active" ? { column: "time", descending: false } : null);
+}
+function getSortValue(connection, column, now) {
+  if (column === "time") {
+    return getConnectionDuration(connection, now);
+  }
+  return Number(connection[column]) || 0;
+}
+function getConnectionsForActiveTab() {
+  const source = activeTab === "active" ? Array.from(activeConnections.values()) : Array.from(closedConnections.values());
+  const connections = sortConnections(source, activeTab);
+  if (!connectionSort) {
+    return connections;
+  }
+  const { column, descending } = connectionSort;
+  const now = Date.now();
+  const direction = descending ? -1 : 1;
+  return connections.sort(
+    (a, b) => direction * (getSortValue(a, column, now) - getSortValue(b, column, now))
+  );
+}
+function sortBy(column) {
+  const shown = getShownSort();
+  connectionSort = shown?.column === column ? { column, descending: !shown.descending } : { column, descending: column !== "time" };
+  redrawForAction();
+}
+function normalizeSearchValue(value) {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+function getSearchValues(connection) {
+  const target = getTargetCellParts(connection);
+  return [
+    connection.id,
+    target.primary,
+    getNetwork(connection),
+    getRoute(connection)?.label || "",
+    formatConnectionDuration(connection),
+    formatBytes(connection.download),
+    formatBytes(connection.upload),
+    getSource(connection).search
+  ].filter(Boolean);
+}
+function matchesConnectionFilters(connection, normalizedSearch) {
+  if (selectedDeviceFilter !== ALL_FILTER_VALUE && getSource(connection).key !== selectedDeviceFilter) {
+    return false;
+  }
+  if (selectedRouteFilter !== ALL_FILTER_VALUE && getRoute(connection)?.tag !== selectedRouteFilter) {
+    return false;
+  }
+  if (!normalizedSearch) {
+    return true;
+  }
+  return getSearchValues(connection).some(
+    (value) => normalizeSearchValue(value).includes(normalizedSearch)
+  );
+}
+function getVisibleConnections() {
+  const normalizedSearch = normalizeSearchValue(searchQuery);
+  return getConnectionsForActiveTab().filter(
+    (connection) => matchesConnectionFilters(connection, normalizedSearch)
+  );
+}
+function filterConnections(connections) {
+  const normalizedSearch = normalizeSearchValue(searchQuery);
+  return Array.from(connections.values()).filter(
+    (connection) => matchesConnectionFilters(connection, normalizedSearch)
+  );
+}
+function hasConnectionFilters() {
+  return selectedDeviceFilter !== ALL_FILTER_VALUE || selectedRouteFilter !== ALL_FILTER_VALUE || normalizeSearchValue(searchQuery) !== "";
+}
+function moveConnectionToClosed(connection, now) {
+  closedConnections.set(connection.id, {
+    ...connection,
+    closedAt: now,
+    lastSeenAt: now
+  });
+}
+function trimClosedConnections() {
+  const sorted = sortConnections(
+    Array.from(closedConnections.values()),
+    "closed"
+  );
+  sorted.slice(CLOSED_CONNECTION_LIMIT).forEach((connection) => {
+    closedConnections.delete(connection.id);
+  });
+}
+function isMonitoringPaused() {
+  return monitoringPaused || selectionHeld;
+}
+function applyConnectionsPayload(payload) {
+  if (isMonitoringPaused()) {
+    pendingConnectionsPayload = payload;
+    return;
+  }
+  const mountId = monitoringMountId;
+  const now = Date.now();
+  const incomingIds = /* @__PURE__ */ new Set();
+  const rawConnections = Array.isArray(payload.connections) ? payload.connections : [];
+  rawConnections.forEach((rawConnection) => {
+    const id = normalizeString(rawConnection.id);
+    if (!id) return;
+    incomingIds.add(id);
+    closedConnections.delete(id);
+    activeConnections.set(id, {
+      ...rawConnection,
+      id,
+      lastSeenAt: now
+    });
+  });
+  Array.from(activeConnections.entries()).forEach(([id, connection]) => {
+    if (!incomingIds.has(id)) {
+      activeConnections.delete(id);
+      moveConnectionToClosed(connection, now);
+    }
+  });
+  trimClosedConnections();
+  loading = false;
+  failed = false;
+  if (monitoringMounted && mountId === monitoringMountId) {
+    renderControls();
+    renderConnections();
+  }
+}
+function setTab(tab) {
+  if (activeTab === tab) return;
+  activeTab = tab;
+  redrawForAction();
+}
+function getKnownSources() {
+  const sources = /* @__PURE__ */ new Map();
+  [activeConnections, closedConnections].forEach(
+    (connections) => connections.forEach((connection) => {
+      const source = getSource(connection);
+      if (source.key && !sources.has(source.key)) {
+        sources.set(source.key, source);
+      }
+    })
+  );
+  return Array.from(sources.values()).sort(compareSources);
+}
+function compareRoutes(a, b) {
+  const rank = ({ tag }) => {
+    if (tag === DIRECT_ROUTE_TAG || tag === "direct") return -1;
+    const index = sectionTags.indexOf(tag);
+    return index < 0 ? sectionTags.length : index;
+  };
+  return rank(a) - rank(b) || a.label.localeCompare(b.label, void 0, { numeric: true });
+}
+function getKnownRoutes() {
+  const routes = /* @__PURE__ */ new Map();
+  [activeConnections, closedConnections].forEach(
+    (connections) => connections.forEach((connection) => {
+      const route = getRoute(connection);
+      if (route) {
+        routes.set(route.tag, route);
+      }
+    })
+  );
+  return Array.from(routes.values()).sort(compareRoutes);
+}
+function renderFilterOptions(id, allLabel, options, selected) {
+  const value = options.some((option) => option.value === selected) ? selected : ALL_FILTER_VALUE;
+  const select = document.getElementById(id);
+  if (!select) return value;
+  const signature = JSON.stringify(options);
+  if (signature !== filterSignatures[id]) {
+    filterSignatures[id] = signature;
+    select.replaceChildren(
+      textE("option", { value: ALL_FILTER_VALUE }, allLabel),
+      ...options.map(
+        (option) => textE("option", { value: option.value }, option.label)
+      )
+    );
+  }
+  select.value = value;
+  return value;
+}
+function renderFilters() {
+  selectedDeviceFilter = renderFilterOptions(
+    "monitoring-device-filter",
+    _("All devices"),
+    getKnownSources().map((source) => ({
+      value: source.key,
+      label: sourceLabel(source.name, source.detail)
+    })),
+    selectedDeviceFilter
+  );
+  selectedRouteFilter = renderFilterOptions(
+    "monitoring-route-filter",
+    _("All routes"),
+    getKnownRoutes().map(({ tag, label }) => ({ value: tag, label })),
+    selectedRouteFilter
+  );
+}
+function renderTab(tab, label, count, active) {
+  if (!tab) return;
+  tab.className = active ? "cbi-tab" : "cbi-tab-disabled";
+  tab.replaceChildren(
+    textE("a", { href: "#" }, [
+      label,
+      " ",
+      textE("span", { class: "fkp_monitoring-page__tab-count" }, String(count))
+    ])
+  );
+}
+function renderControls() {
+  const closeAllButton = document.getElementById(
+    "monitoring-close-all"
+  );
+  const autoRefreshInput = document.getElementById(
+    "monitoring-auto-refresh"
+  );
+  renderFilters();
+  const filteredActive = filterConnections(activeConnections);
+  renderTab(
+    document.getElementById("monitoring-tab-active"),
+    _("Active"),
+    filteredActive.length,
+    activeTab === "active"
+  );
+  renderTab(
+    document.getElementById("monitoring-tab-closed"),
+    _("Closed"),
+    filterConnections(closedConnections).length,
+    activeTab === "closed"
+  );
+  if (closeAllButton) {
+    const filtered = hasConnectionFilters();
+    closeAllButton.textContent = filtered ? _("Close matching") : _("Close all");
+    closeAllButton.title = filtered ? _("Close the connections that match the filters") : _("Close all connections");
+    closeAllButton.disabled = closingAll || filteredActive.length === 0;
+  }
+  if (autoRefreshInput) {
+    autoRefreshInput.checked = !monitoringPaused;
+  }
+  const pauseNote = document.getElementById("monitoring-pause-note");
+  if (pauseNote) {
+    pauseNote.hidden = !selectionHeld || monitoringPaused;
+  }
+  const searchIcon = document.querySelector(
+    ".fkp_monitoring-page__search-icon"
+  );
+  if (searchIcon && searchIcon.childNodes.length === 0) {
+    searchIcon.replaceChildren(renderSearchIcon24());
+  }
+}
+function toListItem(connection) {
+  const source = getSource(connection);
+  const route = getRoute(connection);
+  return {
+    id: connection.id,
+    host: getTargetCellParts(connection).primary,
+    sourceName: source.name,
+    sourceDetail: source.detail,
+    system: source.kind === "system",
+    route: route?.label || "",
+    direct: route?.tag === DIRECT_ROUTE_TAG || route?.tag === "direct",
+    network: getNetwork(connection),
+    time: formatConnectionDuration(connection),
+    download: formatBytes(connection.download),
+    upload: formatBytes(connection.upload),
+    closing: closingConnectionIds.has(connection.id)
+  };
+}
+function isTextSelectionInsideList() {
+  const list = document.getElementById("monitoring-connections");
+  const selection = window.getSelection?.();
+  if (!list || !selection || selection.isCollapsed) return false;
+  return list.contains(selection.anchorNode) || list.contains(selection.focusNode);
+}
+function renderConnections(options = {}) {
+  const container = document.getElementById("monitoring-connections");
+  if (!container) return;
+  if (!options.force && isTextSelectionInsideList()) return;
+  const closable = activeTab === "active";
+  const sort = getShownSort();
+  if (loading) {
+    container.replaceChildren(
+      renderConnectionListState(_("Loading connections..."), {
+        closable,
+        sort,
+        className: "fkp_monitoring-page__state--loading"
+      })
+    );
+    return;
+  }
+  if (failed) {
+    container.replaceChildren(
+      renderConnectionListState(_("Connections are unavailable"), {
+        closable,
+        sort,
+        className: "fkp_monitoring-page__state--error"
+      })
+    );
+    return;
+  }
+  const visibleConnections = getVisibleConnections();
+  if (visibleConnections.length === 0) {
+    container.replaceChildren(
+      renderConnectionListState(
+        closable ? _("No active connections") : _("No closed connections"),
+        { closable, sort }
+      )
+    );
+    return;
+  }
+  container.replaceChildren(
+    renderConnectionList(visibleConnections.map(toListItem), {
+      closable,
+      sort
+    })
+  );
+}
+function updatePause(change) {
+  const user = change.user ?? monitoringPaused;
+  const selection = change.selection ?? selectionHeld;
+  if (user === monitoringPaused && selection === selectionHeld) return;
+  const wasPaused = isMonitoringPaused();
+  monitoringPaused = user;
+  selectionHeld = selection;
+  renderControls();
+  const paused = isMonitoringPaused();
+  if (paused === wasPaused) return;
+  monitoringPausedAt = paused ? Date.now() : null;
+  if (!paused) {
+    const payload = pendingConnectionsPayload;
+    pendingConnectionsPayload = null;
+    if (payload) {
+      applyConnectionsPayload(payload);
+      return;
+    }
+    if (connectionsPoll.active) {
+      connectionsPoll.now();
+    }
+  }
+  renderConnections();
+}
+function holdForSelection() {
+  updatePause({ selection: isTextSelectionInsideList() });
+}
+function redrawForAction() {
+  renderControls();
+  renderConnections({ force: true });
+  holdForSelection();
+}
+function getSelectionValueElements(selection) {
+  const root = document.getElementById("monitoring-status");
+  if (!root) return [];
+  return Array.from(
+    root.querySelectorAll(
+      ".fkp_monitoring-page__value[data-copy-value]"
+    )
+  ).filter((element2) => {
+    for (let index = 0; index < selection.rangeCount; index += 1) {
+      try {
+        if (selection.getRangeAt(index).intersectsNode(element2)) return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
+}
+function handleMonitoringValueCopy(event) {
+  const selection = window.getSelection?.();
+  if (!selection || selection.isCollapsed) return;
+  const valueElements = getSelectionValueElements(selection);
+  if (valueElements.length !== 1) return;
+  const valueElement = valueElements[0];
+  const fullText = valueElement.getAttribute("data-copy-value") || valueElement.textContent || "";
+  const selectedText = selection.toString();
+  if (!shouldCopyFullMonitoringValue(valueElement, selectedText, fullText))
+    return;
+  event.clipboardData?.setData("text/plain", fullText);
+  event.preventDefault();
+}
+async function closeConnection(connectionId) {
+  if (!connectionId || closingConnectionIds.has(connectionId)) return;
+  closingConnectionIds.add(connectionId);
+  renderConnections();
+  try {
+    const response = await CustomPodkopMethods.closeClashApiConnection(connectionId);
+    if (!response.success) {
+      showToast(_("Failed to close connection"), "error");
+      return;
+    }
+    const now = Date.now();
+    const connection = activeConnections.get(connectionId);
+    if (connection) {
+      activeConnections.delete(connectionId);
+      moveConnectionToClosed(connection, now);
+      trimClosedConnections();
+      pendingConnectionsPayload = null;
+      renderControls();
+    }
+  } catch (error) {
+    logger.error("[MONITORING]", "closeConnection: failed", error);
+    showToast(_("Failed to close connection"), "error");
+  } finally {
+    closingConnectionIds.delete(connectionId);
+    renderConnections();
+  }
+}
+async function closeAllConnections() {
+  if (activeConnections.size === 0 || closingAll) return;
+  if (hasConnectionFilters()) {
+    await closeMatchingConnections();
+    return;
+  }
+  closingAll = true;
+  renderControls();
+  try {
+    const response = await CustomPodkopMethods.closeAllClashApiConnections();
+    if (!response.success) {
+      showToast(_("Failed to close connections"), "error");
+      return;
+    }
+    const now = Date.now();
+    activeConnections.forEach((connection) => {
+      moveConnectionToClosed(connection, now);
+    });
+    activeConnections.clear();
+    pendingConnectionsPayload = null;
+    trimClosedConnections();
+  } catch (error) {
+    logger.error("[MONITORING]", "closeAllConnections: failed", error);
+    showToast(_("Failed to close connections"), "error");
+  } finally {
+    closingAll = false;
+    renderControls();
+    renderConnections();
+  }
+}
+async function closeMatchingConnections() {
+  const ids = filterConnections(activeConnections).map(({ id }) => id);
+  if (ids.length === 0) return;
+  closingAll = true;
+  ids.forEach((id) => closingConnectionIds.add(id));
+  renderControls();
+  renderConnections();
+  try {
+    const { closed, failed: failedIds } = await closeConnections(
+      ids,
+      (id) => CustomPodkopMethods.closeClashApiConnection(id)
+    );
+    const now = Date.now();
+    closed.forEach((id) => {
+      const connection = activeConnections.get(id);
+      if (connection) {
+        activeConnections.delete(id);
+        moveConnectionToClosed(connection, now);
+      }
+    });
+    if (closed.length) {
+      pendingConnectionsPayload = null;
+      trimClosedConnections();
+    }
+    if (failedIds.length) {
+      showToast(_("Failed to close connections"), "error");
+    }
+  } finally {
+    ids.forEach((id) => closingConnectionIds.delete(id));
+    closingAll = false;
+    renderControls();
+    renderConnections();
+  }
+}
+function bindControls() {
+  const activeTabItem = document.getElementById("monitoring-tab-active");
+  const closedTabItem = document.getElementById("monitoring-tab-closed");
+  const deviceFilter = document.getElementById(
+    "monitoring-device-filter"
+  );
+  const routeFilter = document.getElementById(
+    "monitoring-route-filter"
+  );
+  const searchInput = document.getElementById(
+    "monitoring-search"
+  );
+  const closeAllButton = document.getElementById("monitoring-close-all");
+  const autoRefreshInput = document.getElementById(
+    "monitoring-auto-refresh"
+  );
+  const connectionsContainer = document.getElementById(
+    "monitoring-connections"
+  );
+  if (activeTabItem) {
+    activeTabItem.onclick = (event) => {
+      event.preventDefault();
+      setTab("active");
+    };
+  }
+  if (closedTabItem) {
+    closedTabItem.onclick = (event) => {
+      event.preventDefault();
+      setTab("closed");
+    };
+  }
+  if (closeAllButton) {
+    closeAllButton.onclick = () => {
+      void closeAllConnections();
+    };
+  }
+  if (autoRefreshInput) {
+    autoRefreshInput.onchange = () => {
+      updatePause({ user: !autoRefreshInput.checked });
+    };
+  }
+  if (deviceFilter) {
+    deviceFilter.onchange = () => {
+      selectedDeviceFilter = deviceFilter.value;
+      redrawForAction();
+    };
+  }
+  if (routeFilter) {
+    routeFilter.onchange = () => {
+      selectedRouteFilter = routeFilter.value;
+      redrawForAction();
+    };
+  }
+  if (searchInput) {
+    searchInput.oninput = () => {
+      searchQuery = searchInput.value;
+      redrawForAction();
+    };
+  }
+  if (connectionsContainer) {
+    connectionsContainer.onclick = (event) => {
+      const target = event.target;
+      const button = target?.closest(
+        ".fkp_monitoring-page__row-action"
+      );
+      const sortButton = target?.closest(
+        ".fkp_monitoring-page__sort"
+      );
+      if (button?.value) {
+        void closeConnection(button.value);
+      } else if (sortButton?.value) {
+        sortBy(sortButton.value);
+      }
+    };
+  }
+}
+async function loadLocalDeviceNames() {
+  try {
+    localDeviceNames = (await loadLocalDevices()).names;
+  } catch (error) {
+    logger.warn("[MONITORING]", "loadLocalDeviceNames: failed", error);
+    localDeviceNames = {};
+  } finally {
+    renderControls();
+    renderConnections();
+  }
+}
+async function loadRouteDisplayNames() {
+  try {
+    buildRouteDisplayNames(await CustomPodkopMethods.getConfigSections());
+  } catch (error) {
+    logger.warn("[MONITORING]", "loadRouteDisplayNames: failed", error);
+    buildRouteDisplayNames([]);
+  } finally {
+    renderControls();
+    renderConnections();
+  }
+}
+function reportPollFailure() {
+  consecutivePollFailures += 1;
+  failed = true;
+  loading = false;
+  renderConnections();
+}
+async function pollConnectionsSnapshot() {
+  if (!monitoringMounted || isMonitoringPaused()) return;
+  const mountId = monitoringMountId;
+  const startedAt = Date.now();
+  try {
+    const response = await CustomPodkopMethods.getClashApiConnections();
+    lastConnectionsPollDurationMs = Date.now() - startedAt;
+    if (!monitoringMounted || mountId !== monitoringMountId || !connectionsPoll.active) {
+      return;
+    }
+    if (!response.success) {
+      reportPollFailure();
+      return;
+    }
+    consecutivePollFailures = 0;
+    applyConnectionsPayload(normalizeConnectionsPayload(response.data));
+  } catch (error) {
+    if (!monitoringMounted || mountId !== monitoringMountId || !connectionsPoll.active) {
+      return;
+    }
+    logger.error("[MONITORING]", "connections polling failed", error);
+    reportPollFailure();
+  }
+}
+function connectionsPollDelay() {
+  if (consecutivePollFailures > 0) {
+    return Math.min(
+      CONNECTIONS_RPC_POLL_INTERVAL_MS * 2 ** consecutivePollFailures,
+      CONNECTIONS_RPC_POLL_BACKOFF_MAX_MS
+    );
+  }
+  return pollDelayForDuration(
+    CONNECTIONS_RPC_POLL_INTERVAL_MS,
+    lastConnectionsPollDurationMs,
+    CONNECTIONS_POLL_DUTY_MAX_MS
+  );
+}
+var connectionsPoll = createPollChain(
+  pollConnectionsSnapshot,
+  connectionsPollDelay
+);
+function startConnectionsPolling() {
+  connectionsPoll.start(0);
+}
+function stopConnectionsPolling() {
+  connectionsPoll.stop();
+  consecutivePollFailures = 0;
+  if (connectionsSocketGraceTimer) {
+    clearTimeout(connectionsSocketGraceTimer);
+    connectionsSocketGraceTimer = null;
+  }
+}
+async function connectToConnectionsSocket(updatesId) {
+  const mountId = monitoringMountId;
+  const clashApiSecret = await CustomPodkopMethods.getClashApiSecret().catch(
+    () => ""
+  );
+  if (!monitoringMounted || mountId !== monitoringMountId || updatesId !== connectionsUpdatesId) {
+    return;
+  }
+  connectionsSocketUrl = getClashSocketUrl("/connections", clashApiSecret);
+  socket.subscribe(
+    connectionsSocketUrl,
+    (msg) => {
+      if (updatesId !== connectionsUpdatesId) return;
+      stopConnectionsPolling();
+      try {
+        applyConnectionsPayload(JSON.parse(msg));
+      } catch (error) {
+        logger.error("[MONITORING]", "connections socket parse failed", error);
+      }
+    },
+    (_err) => {
+      if (!monitoringMounted || mountId !== monitoringMountId || updatesId !== connectionsUpdatesId) {
+        return;
+      }
+      startConnectionsPolling();
+    }
+  );
+}
+function startConnectionsUpdates() {
+  if (canUseDirectClashApi()) {
+    const updatesId = ++connectionsUpdatesId;
+    void connectToConnectionsSocket(updatesId);
+    connectionsSocketGraceTimer = setTimeout(() => {
+      connectionsSocketGraceTimer = null;
+      startConnectionsPolling();
+    }, CONNECTIONS_SOCKET_GRACE_MS);
+    return;
+  }
+  startConnectionsPolling();
+}
+function stopConnectionsUpdates() {
+  connectionsUpdatesId += 1;
+  stopConnectionsPolling();
+  if (connectionsSocketUrl) {
+    socket.disconnect(connectionsSocketUrl);
+    connectionsSocketUrl = "";
+  }
+}
+function resetMonitoringState() {
+  activeTab = "active";
+  selectedDeviceFilter = ALL_FILTER_VALUE;
+  selectedRouteFilter = ALL_FILTER_VALUE;
+  searchQuery = "";
+  connectionSort = null;
+  filterSignatures = {};
+  loading = true;
+  failed = false;
+  closingAll = false;
+  monitoringPaused = false;
+  selectionHeld = false;
+  monitoringPausedAt = null;
+  consecutivePollFailures = 0;
+  lastConnectionsPollDurationMs = 0;
+  pendingConnectionsPayload = null;
+  activeConnections.clear();
+  closedConnections.clear();
+  closingConnectionIds.clear();
+  const searchInput = document.getElementById(
+    "monitoring-search"
+  );
+  if (searchInput) searchInput.value = "";
+}
+function onPageMount3() {
+  onPageUnmount3();
+  monitoringMounted = true;
+  monitoringMountId += 1;
+  CustomPodkopMethods.resetClashApiTransport();
+  resetMonitoringState();
+  bindControls();
+  renderControls();
+  renderConnections();
+  startConnectionsUpdates();
+  void loadLocalDeviceNames();
+  void loadRouteDisplayNames();
+  document.addEventListener("selectionchange", holdForSelection);
+  document.addEventListener("copy", handleMonitoringValueCopy);
+  renderTimer = setInterval(() => {
+    if (isMonitoringPaused() || !isDocumentVisible()) return;
+    renderConnections();
+  }, RENDER_INTERVAL_MS);
+}
+function onPageUnmount3() {
+  monitoringMounted = false;
+  monitoringMountId += 1;
+  if (renderTimer) {
+    clearInterval(renderTimer);
+    renderTimer = null;
+  }
+  stopConnectionsUpdates();
+  document.removeEventListener("selectionchange", holdForSelection);
+  document.removeEventListener("copy", handleMonitoringValueCopy);
+}
+var monitoringLifecycle = createTabLifecycle({
+  shown: () => isDocumentVisible() && Boolean(store.get().tabService?.current?.includes("monitoring")),
+  start: onPageMount3,
+  stop: onPageUnmount3
+});
+function registerLifecycleListeners3() {
+  if (monitoringLifecycleRegistered) return;
+  monitoringLifecycleRegistered = true;
+  store.subscribe(
+    (next, prev, diff) => {
+      if (diff.tabService && next.tabService.current !== prev.tabService.current) {
+        monitoringLifecycle.update();
+      }
+    }
+  );
+  document.addEventListener(
+    "visibilitychange",
+    () => monitoringLifecycle.update()
+  );
+}
+async function initController3() {
+  if (monitoringControllerInitialized) return;
+  monitoringControllerInitialized = true;
+  onMount("monitoring-status").then(() => {
+    registerLifecycleListeners3();
+    monitoringLifecycle.update();
+  });
+}
+
+// src/podkop/tabs/monitoring/styles.ts
+var styles5 = `
+#cbi-podkop-monitoring-_mount_node {
+    display: block;
+    margin: 16px 0 22px;
+    padding: 0;
+}
+
+#cbi-podkop-monitoring > h3 {
+    display: none;
+}
+
+.fkp_monitoring-page {
+    --fkp-monitoring-row-action-size: 24px;
+    --fkp-monitoring-divider-color: rgba(127, 127, 127, 0.22);
+    --fkp-monitoring-soft-bg: rgba(127, 127, 127, 0.08);
+    --fkp-monitoring-soft-bg-hover: rgba(127, 127, 127, 0.14);
+    --fkp-monitoring-danger-color: var(--error-color-medium, #d32f2f);
+
+    container-type: inline-size;
+    width: 100%;
+    min-width: 0;
+}
+
+.fkp_monitoring-page__panel {
+    margin-top: 0;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+}
+
+.fkp_monitoring-page__controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    grid-template-areas: 'filters actions';
+    align-items: center;
+    gap: 12px 16px;
+    margin-bottom: 12px;
+}
+
+.fkp_monitoring-page__pause-note {
+    flex: 1 1 0;
+    min-width: 0;
+    align-self: center;
+    margin-left: 8px;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-color-medium, #888);
+}
+
+.fkp_monitoring-page__pause-note[hidden] {
+    display: none;
+}
+
+.fkp_monitoring-page__tab-count {
+    color: var(--text-color-medium, #888);
+    font-variant-numeric: tabular-nums;
+}
+
+.fkp_monitoring-page__filters {
+    grid-area: filters;
+    display: grid;
+    grid-template-columns: minmax(0, 220px) minmax(0, 220px) minmax(0, 320px);
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.fkp_monitoring-page .fkp_monitoring-page__filters > * {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+.fkp_monitoring-page__search {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.fkp_monitoring-page__search-icon {
+    position: absolute;
+    left: 8px;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    color: var(--text-color-medium, #888);
+}
+
+.fkp_monitoring-page__search-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.fkp_monitoring-page input.fkp_monitoring-page__search-input {
+    padding-left: 30px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.fkp_monitoring-page__actions {
+    grid-area: actions;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.fkp_monitoring-page__checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.fkp_monitoring-page__checkbox input {
+    margin: 0;
+}
+
+.fkp_monitoring-page__action {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.fkp_monitoring-page__tabs {
+    display: flex;
+    align-items: flex-end;
+    margin-top: 0;
+    margin-bottom: 8px;
+    padding-bottom: 0;
+}
+
+.fkp_monitoring-page__body {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+
+.fkp_monitoring-page__list {
+    display: table;
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.fkp_monitoring-page__row {
+    display: table-row;
+}
+
+.fkp_monitoring-page__row:not(.fkp_monitoring-page__row--head):hover {
+    background: var(--fkp-monitoring-soft-bg);
+}
+
+.fkp_monitoring-page__row--head {
+    font-weight: bold;
+    border-bottom: 2px solid var(--fkp-monitoring-divider-color);
+}
+
+.fkp_monitoring-page__row--closing {
+    opacity: 0.5;
+}
+
+.fkp_monitoring-page__cell {
+    display: table-cell;
+    padding: 6px 10px;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--fkp-monitoring-divider-color);
+}
+
+.fkp_monitoring-page__cell--host {
+    width: 25%;
+}
+
+.fkp_monitoring-page__cell--source {
+    width: 18%;
+}
+
+.fkp_monitoring-page__cell--route {
+    width: 15%;
+}
+
+.fkp_monitoring-page__cell--network {
+    width: 8%;
+}
+
+.fkp_monitoring-page__cell--time {
+    width: 10%;
+    text-align: right;
+}
+
+.fkp_monitoring-page__cell--download {
+    width: 10%;
+    text-align: right;
+}
+
+.fkp_monitoring-page__cell--upload {
+    width: 10%;
+    text-align: right;
+}
+
+.fkp_monitoring-page__cell--action {
+    width: 4%;
+    text-align: center;
+}
+
+.fkp_monitoring-page__sort {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.fkp_monitoring-page__sort-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.fkp_monitoring-page__tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.fkp_monitoring-page__tag--builtin {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.fkp_monitoring-page__muted {
+    opacity: 0.6;
+    font-size: 0.9em;
+}
+
+.fkp_monitoring-page__row-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+.fkp_monitoring-page__row-action:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.fkp_monitoring-page__row-action svg {
+    width: 14px;
+    height: 14px;
+}
+
+.fkp_monitoring-page__state {
+    padding: 32px;
+    text-align: center;
+    color: var(--text-color-medium, #888);
+}
+`;
+
+// src/podkop/tabs/monitoring/index.ts
+var MonitoringTab = {
+  render: render3,
+  initController: initController3,
+  styles: styles5
+};
+
 // src/styles.ts
 var GlobalStyles = `
 ${DashboardTab.styles}
 ${DiagnosticTab.styles}
+${MonitoringTab.styles}
 ${PartialStyles}
 
 
@@ -4952,44 +7085,6 @@ function getProxyUrlName(url) {
   }
 }
 
-// src/helpers/onMount.ts
-async function onMount(id) {
-  return new Promise((resolve) => {
-    const el = document.getElementById(id);
-    if (el && el.offsetParent !== null) {
-      return resolve(el);
-    }
-    const observer = new MutationObserver(() => {
-      const target = document.getElementById(id);
-      if (target) {
-        const io = new IntersectionObserver((entries) => {
-          const visible = entries.some((e) => e.isIntersecting);
-          if (visible) {
-            observer.disconnect();
-            io.disconnect();
-            resolve(target);
-          }
-        });
-        io.observe(target);
-      }
-    });
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-  });
-}
-
-// src/helpers/getClashApiUrl.ts
-function getClashWsUrl() {
-  const { hostname } = window.location;
-  return `ws://${hostname}:9090`;
-}
-function getClashUIUrl() {
-  const { hostname } = window.location;
-  return `http://${hostname}:9090/ui`;
-}
-
 // src/helpers/splitProxyString.ts
 function splitProxyString(str) {
   return str.split("\n").map((line) => line.trim()).filter((line) => !line.startsWith("//")).filter(Boolean);
@@ -5002,17 +7097,6 @@ function preserveScrollForPage(renderFn) {
   requestAnimationFrame(() => {
     window.scrollTo({ top: scrollY });
   });
-}
-
-// src/helpers/svgEl.ts
-function svgEl(tag, attrs = {}, children = []) {
-  const NS = "http://www.w3.org/2000/svg";
-  const el = document.createElementNS(NS, tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (v != null) el.setAttribute(k, String(v));
-  }
-  (Array.isArray(children) ? children : [children]).filter(Boolean).forEach((ch) => el.appendChild(ch));
-  return el;
 }
 
 // src/helpers/insertIf.ts
@@ -5040,34 +7124,47 @@ return baseclass.extend({
   DOMAIN_LIST_OPTIONS,
   DashboardTab,
   DiagnosticTab,
+  textE as E,
   ERROR_POLL_INTERVAL,
   FAKEIP_CHECK_DOMAIN,
   FETCH_TIMEOUT,
   IP_CHECK_DOMAIN,
   Logger,
+  MonitoringTab,
   PODKOP_LUCI_APP_VERSION,
   PodkopShellMethods,
   REGIONAL_OPTIONS,
   RemoteFakeIPMethods,
   STATUS_COLORS,
+  TAB_HIDDEN_GRACE_MS,
   TabService,
   TabServiceInstance,
   UPDATE_INTERVAL_OPTIONS,
   URLTEST_DOWNLOAD_URL_OPTIONS,
   bulkValidate,
+  canUseDirectClashApi,
   coreService,
+  createPollChain,
+  createTabLifecycle,
+  domainToUnicode,
   executeShellCommand,
+  getClashApiUrl,
+  getClashSocketUrl,
   getClashUIUrl,
   getClashWsUrl,
   getProxyUrlName,
   injectGlobalStyles,
   insertIf,
   insertIfObj,
+  isDocumentVisible,
+  loadLocalDevices,
   logger,
   maskIP,
   onMount,
+  parseHostPort,
   parseQueryString,
   parseValueList,
+  pollDelayForDuration,
   preserveScrollForPage,
   socket,
   splitProxyString,
@@ -5075,7 +7172,10 @@ return baseclass.extend({
   svgEl,
   validateDNS,
   validateDomain,
+  validateHysteria2Url,
+  validateIP,
   validateIPV4,
+  validateIPV6,
   validateOutboundJson,
   validatePath,
   validateProxyUrl,
@@ -5086,5 +7186,6 @@ return baseclass.extend({
   validateTuicUrl,
   validateUrl,
   validateVlessUrl,
+  whenDocumentVisible,
   withTimeout
 });

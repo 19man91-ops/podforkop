@@ -17,25 +17,111 @@ _subscription_extract_links() {
     local output_file="$2"
     local candidate_file="$input_file"
     local decoded_file="$input_file.decoded"
+    local parsed_file="$input_file.parsed"
     local encoded remainder
 
-    if ! grep -Eiq '^[[:space:]]*(vless|vmess|trojan|ss|socks|socks4a?|socks5h?|hysteria2|hy2|hysteria|tuic|http|https|anytls|naive\+(https|quic))://' "$input_file"; then
+    # 1. Check if Base64 encoded
+    if ! grep -Eiq '^[[:space:]]*(vless|vmess|trojan|ss|socks|socks4a?|socks5h?|hysteria2|hy2|hysteria|tuic|http|https|anytls|naive\+(https|quic))://' "$input_file" && \
+       ! grep -Eq '^[[:space:]]*[\{\[]' "$input_file" && \
+       ! grep -Eq '^[[:space:]]*proxies:' "$input_file"; then
         encoded="$(tr -d '[:space:]' < "$input_file" | tr '_-' '/+')"
         remainder=$((${#encoded} % 4))
         case "$remainder" in
         2) encoded="${encoded}==" ;;
         3) encoded="${encoded}=" ;;
         1)
-            rm -f "$decoded_file"
+            rm -f "$decoded_file" "$parsed_file"
             return 1
             ;;
         esac
 
-        if ! printf '%s' "$encoded" | base64 -d > "$decoded_file" 2>/dev/null; then
-            rm -f "$decoded_file"
-            return 1
+        if printf '%s' "$encoded" | base64 -d > "$decoded_file" 2>/dev/null; then
+            candidate_file="$decoded_file"
         fi
-        candidate_file="$decoded_file"
+    fi
+
+    rm -f "$parsed_file"
+
+    # 2. Try SIP008 Shadowsocks JSON
+    if jq -e '.servers and (.servers | type == "array")' "$candidate_file" >/dev/null 2>&1; then
+        jq -r '.servers[]? | select(.server and .server_port and .method and .password) |
+            "ss://" + ((.method + ":" + .password) | @base64) + "@" + (.server|tostring) + ":" + (.server_port|tostring) + (if .remarks then ("#" + (.remarks|@uri)) else "" end)' \
+            "$candidate_file" >> "$parsed_file" 2>/dev/null
+    fi
+
+    # 3. Try sing-box / Xray JSON outbounds
+    if [ ! -s "$parsed_file" ] && jq -e '.outbounds and (.outbounds | type == "array")' "$candidate_file" >/dev/null 2>&1; then
+        jq -r '.outbounds[]? |
+            if .type == "vless" then
+                "vless://" + (.uuid // "") + "@" + (.server // "") + ":" + ((.server_port // 443)|tostring) + "?security=" + (if .tls?.enabled then "tls" else "none" end) + (if .tag then "#" + (.tag|@uri) else "" end)
+            elif .type == "trojan" then
+                "trojan://" + (.password // "") + "@" + (.server // "") + ":" + ((.server_port // 443)|tostring) + "?security=" + (if .tls?.enabled then "tls" else "none" end) + (if .tag then "#" + (.tag|@uri) else "" end)
+            elif .type == "shadowsocks" then
+                "ss://" + (((.method // "") + ":" + (.password // "")) | @base64) + "@" + (.server // "") + ":" + ((.server_port // 8388)|tostring) + (if .tag then "#" + (.tag|@uri) else "" end)
+            elif .type == "hysteria2" then
+                "hysteria2://" + (.password // "") + "@" + (.server // "") + ":" + ((.server_port // 443)|tostring) + (if .tag then "#" + (.tag|@uri) else "" end)
+            elif .type == "socks" then
+                "socks5://" + (if .username then (.username + ":" + (.password // "") + "@") else "" end) + (.server // "") + ":" + ((.server_port // 1080)|tostring) + (if .tag then "#" + (.tag|@uri) else "" end)
+            else empty end' "$candidate_file" >> "$parsed_file" 2>/dev/null
+    fi
+
+    # 4. Try Clash / Mihomo YAML
+    if [ ! -s "$parsed_file" ] && grep -Eq '^[[:space:]]*proxies:' "$candidate_file" 2>/dev/null; then
+        awk '
+            BEGIN { in_proxies = 0 }
+            /^[[:space:]]*proxies:/ { in_proxies = 1; next }
+            /^[a-zA-Z0-9_-]+:/ && !/^[[:space:]]*proxies:/ { in_proxies = 0 }
+            in_proxies && /^[[:space:]]*-/ {
+                if (type != "" && server != "" && port != "") {
+                    emit(type, name, server, port, uuid, password, cipher)
+                }
+                type = ""; name = ""; server = ""; port = ""; uuid = ""; password = ""; cipher = ""
+            }
+            in_proxies {
+                line = $0
+                sub(/^[[:space:]]*-[[:space:]]*/, "", line)
+                sub(/^[[:space:]]+/, "", line)
+                colon = index(line, ":")
+                if (colon > 0) {
+                    k = substr(line, 1, colon - 1)
+                    v = substr(line, colon + 1)
+                    sub(/^[[:space:]]+/, "", v)
+                    sub(/[[:space:]]+$/, "", v)
+                    gsub(/^["'\''"]|["'\''"]$/, "", v)
+                    if (k == "name") name = v
+                    else if (k == "type") type = tolower(v)
+                    else if (k == "server") server = v
+                    else if (k == "port") port = v
+                    else if (k == "uuid") uuid = v
+                    else if (k == "password") password = v
+                    else if (k == "cipher") cipher = v
+                }
+            }
+            END {
+                if (in_proxies && type != "" && server != "" && port != "") {
+                    emit(type, name, server, port, uuid, password, cipher)
+                }
+            }
+            function emit(t, n, s, p, u, pw, c) {
+                tag = (n != "" ? "#" n : "")
+                if (t == "ss") {
+                    print "ss://" c ":" pw "@" s ":" p tag
+                } else if (t == "vless") {
+                    print "vless://" u "@" s ":" p "?security=tls" tag
+                } else if (t == "trojan") {
+                    print "trojan://" pw "@" s ":" p "?security=tls" tag
+                } else if (t == "hysteria2" || t == "hy2") {
+                    print "hysteria2://" pw "@" s ":" p tag
+                } else if (t == "socks5" || t == "socks") {
+                    print "socks5://" (pw != "" ? pw "@" : "") s ":" p tag
+                }
+            }
+        ' "$candidate_file" >> "$parsed_file" 2>/dev/null
+    fi
+
+    # 5. Fallback or Plain links
+    if [ -s "$parsed_file" ]; then
+        candidate_file="$parsed_file"
     fi
 
     awk '
@@ -49,7 +135,7 @@ _subscription_extract_links() {
             }
         }
     ' "$candidate_file" > "$output_file"
-    rm -f "$decoded_file"
+    rm -f "$decoded_file" "$parsed_file"
     [ -s "$output_file" ]
 }
 
@@ -269,19 +355,28 @@ subscription_cached_links() {
 subscription_update() {
     if sing_box_uses_subscription_providers; then
         log "Updating proxy subscriptions via sing-box-forkop..."
-        if /etc/init.d/sing-box status >/dev/null 2>&1; then
-            /usr/bin/podkop clash_api update_provider >/dev/null 2>&1 || /etc/init.d/sing-box reload 2>/dev/null || /etc/init.d/sing-box restart
+        if ! /etc/init.d/sing-box status >/dev/null 2>&1; then
+            log "sing-box service is not running; cannot update proxy subscriptions" "warn"
+            return 1
         fi
-        log "Proxy subscriptions updated"
-        return 0
+        if /usr/bin/podkop clash_api update_provider >/dev/null 2>&1 || /etc/init.d/sing-box reload 2>/dev/null; then
+            log "Proxy subscriptions updated successfully"
+            return 0
+        else
+            log "Failed to update proxy subscriptions via Clash API / reload" "warn"
+            return 1
+        fi
     fi
     subscription_refresh_all
+    if [ "$PODKOP_SUBSCRIPTIONS_FAILED" = "1" ]; then
+        log "One or more proxy subscriptions could not be updated; cached data was left unchanged" "warn"
+        return 1
+    fi
     if [ "$PODKOP_SUBSCRIPTIONS_CHANGED" = "1" ]; then
         log "Proxy subscriptions changed; reloading Podkop"
         /etc/init.d/podkop reload
-    elif [ "$PODKOP_SUBSCRIPTIONS_FAILED" = "1" ]; then
-        log "One or more proxy subscriptions could not be updated; cached data was left unchanged" "warn"
     else
         log "Proxy subscriptions are up to date"
     fi
+    return 0
 }

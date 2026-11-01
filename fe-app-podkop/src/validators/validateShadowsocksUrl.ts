@@ -1,4 +1,5 @@
 import { ValidationResult } from './types';
+import { parseHostPort } from './parseHostPort';
 
 // TODO refactor current validation and add tests
 export function validateShadowsocksUrl(url: string): ValidationResult {
@@ -59,7 +60,8 @@ export function validateShadowsocksUrl(url: string): ValidationResult {
       };
     }
 
-    const [server, portAndRest] = serverPart.split(':');
+    const hostPortOnly = serverPart.split(/[?#]/)[0];
+    const { host: server, port } = parseHostPort(hostPortOnly);
 
     if (!server) {
       return {
@@ -67,8 +69,6 @@ export function validateShadowsocksUrl(url: string): ValidationResult {
         message: _('Invalid Shadowsocks URL: missing server'),
       };
     }
-
-    const port = portAndRest ? portAndRest.split(/[?#]/)[0] : null;
 
     if (!port) {
       return {

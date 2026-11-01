@@ -73,7 +73,22 @@ export namespace Podkop {
     GET_PROXY_LATENCY = 'get_proxy_latency',
     GET_GROUP_LATENCY = 'get_group_latency',
     SET_GROUP_PROXY = 'set_group_proxy',
+    GET_CONNECTIONS = 'get_connections',
+    CLOSE_CONNECTION = 'close_connection',
+    CLOSE_CONNECTIONS = 'close_connections',
   }
+
+  export interface ClashConnection {
+    id?: string;
+    start?: string;
+    download?: number;
+    upload?: number;
+    chains?: string[];
+    rule?: string;
+    metadata?: { host?: string; destinationIP?: string; destinationPort?: string|number; sourceIP?: string; network?: string; type?: string };
+  }
+
+  export interface ClashConnections { connections?: ClashConnection[]; downloadTotal?: number; uploadTotal?: number; }
 
   export interface Outbound {
     code: string;

@@ -11,4 +11,6 @@ export * from './validateOutboundJson';
 export * from './validateTrojanUrl';
 export * from './validateProxyUrl';
 export * from './validateSocksUrl';
+export * from './validateHysteriaUrl';
 export * from './validateTuicUrl';
+export * from './parseHostPort';

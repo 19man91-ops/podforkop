@@ -1,4 +1,5 @@
 import { ValidationResult } from './types';
+import { parseHostPort } from './parseHostPort';
 
 export function validateTrojanUrl(url: string): ValidationResult {
   try {
@@ -37,7 +38,7 @@ export function validateTrojanUrl(url: string): ValidationResult {
         message: 'Invalid Trojan URL: missing hostname and port',
       };
 
-    const [host, port] = hostPortPart.split(':');
+    const { host, port } = parseHostPort(hostPortPart);
 
     if (!host)
       return { valid: false, message: 'Invalid Trojan URL: missing hostname' };

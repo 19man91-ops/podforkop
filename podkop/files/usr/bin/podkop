@@ -687,31 +687,10 @@ configure_outbound_handler() {
                 exit 1
             fi
 
-            if sing_box_uses_subscription_providers && {
-                case "$proxy_string" in
-                http://* | https://*)
-                    case "$proxy_string" in
-                    *@*) false ;;
-                    *) true ;;
-                    esac
-                    ;;
-                /*) true ;;
-                *) false ;;
-                esac
-            }; then
-                log "Proxy string recognized as subscription source; configuring subscription provider" "debug"
-                configure_subscription_providers "$section" "url" "$proxy_string"
-                local selector_tag selector_outbounds
-                selector_tag="$(get_outbound_tag_by_section "$section")"
-                selector_outbounds="[]"
-                config="$(sing_box_cm_add_selector_outbound "$config" "$selector_tag" "$selector_outbounds" "")"
-                config="$(sing_box_cm_add_group_providers "$config" "$selector_tag" "$PODKOP_SUBSCRIPTION_PROVIDER_TAGS")"
-            else
-                config=$(sing_box_cf_add_proxy_outbound "$config" "$section" "$proxy_string" "$udp_over_tcp") || {
-                    log "Could not decode the proxy URL for section $section. Aborted." "fatal"
-                    exit 1
-                }
-            fi
+            config=$(sing_box_cf_add_proxy_outbound "$config" "$section" "$proxy_string" "$udp_over_tcp") || {
+                log "Could not decode the proxy URL for section $section. Aborted." "fatal"
+                exit 1
+            }
             ;;
         outbound)
             log "Detected proxy configuration type: outbound" "debug"
@@ -2569,8 +2548,21 @@ clash_api() {
         fi
         ;;
 
+    get_connections)
+        curl -sS --fail --header "$auth_header" "$CLASH_URL/connections" | jq .
+        ;;
+
+    close_connection)
+        [ -n "$2" ] || return 1
+        curl -sS --fail -X DELETE --header "$auth_header" "$CLASH_URL/connections/$(printf '%s' "$2" | sed 's/[^A-Za-z0-9_.:-]//g')" | jq .
+        ;;
+
+    close_connections | close_all_connections)
+        curl -sS --fail -X DELETE --header "$auth_header" "$CLASH_URL/connections" | jq .
+        ;;
+
     *)
-        echo '{"error":"unknown action","available":["get_proxies","get_proxy_latency","get_group_latency","set_group_proxy","get_providers","update_provider"]}' | jq .
+        echo '{"error":"unknown action","available":["get_proxies","get_proxy_latency","get_group_latency","set_group_proxy","get_providers","update_provider","get_connections","close_connection","close_connections"]}' | jq .
         return 1
         ;;
     esac

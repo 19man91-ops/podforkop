@@ -3,6 +3,10 @@ import { Podkop } from '../../types';
 import { getProxyUrlName, splitProxyString } from '../../../helpers';
 import { PodkopShellMethods } from '../shell';
 
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 interface IGetDashboardSectionsResponse {
   success: boolean;
   data: Podkop.OutboundGroup[];
@@ -91,7 +95,14 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
             (proxy) => proxy.code === `${section['.name']}-out`,
           );
 
-          const parsedOutbound = JSON.parse(section.outbound_json);
+          let parsedOutbound: any = null;
+          try {
+            parsedOutbound = section.outbound_json
+              ? JSON.parse(section.outbound_json)
+              : null;
+          } catch {
+            parsedOutbound = null;
+          }
           const parsedTag = parsedOutbound?.tag
             ? decodeURIComponent(parsedOutbound?.tag)
             : undefined;
@@ -133,7 +144,7 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
               const item = proxies.find((p) => p.code === code);
               let displayName = '';
               const linkMatch = code.match(
-                new RegExp(`^${section['.name']}-(\\d+)-out$`),
+                new RegExp(`^${escapeRegExp(section['.name'])}-(\\d+)-out$`),
               );
               if (linkMatch) {
                 const linkIndex = parseInt(linkMatch[1], 10) - 1;
@@ -199,7 +210,9 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
               const item = proxies.find((p) => p.code === code);
               let displayName = '';
               const linkMatch = code.match(
-                new RegExp(`^${section['.name']}-(?:fallback-)?(\\d+)-out$`),
+                new RegExp(
+                  `^${escapeRegExp(section['.name'])}-(?:fallback-)?(\\d+)-out$`,
+                ),
               );
               if (linkMatch && links[index]) {
                 displayName = getProxyUrlName(links[index]);

@@ -52,6 +52,10 @@ const validUrls = [
     'xhttp + none',
     'vless://c2841505-ec32-4b8d-b6dd-3e19d648c321@127.0.0.1:45507?type=xhttp&encryption=none&path=%2Fxhttppath&host=xhttp&mode=auto&security=none#vless-xhttp',
   ],
+  [
+    'ipv6 endpoint',
+    'vless://e95163dc-905e-480a-afe5-20b146288679@[2001:db8::1]:443?type=tcp&security=tls#ipv6-node',
+  ],
 ];
 
 const invalidUrls = [

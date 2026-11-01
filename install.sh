@@ -30,7 +30,7 @@ download_asset() {
             if command -v curl >/dev/null 2>&1; then
                 curl -fsSL -o "$filepath" "$browser_url" 2>/dev/null
             else
-                wget -q -O "$filepath" "$browser_url" 2>/dev/null
+                wget -q --no-check-certificate -O "$filepath" "$browser_url" 2>/dev/null
             fi
             if [ -s "$filepath" ]; then
                 msg "$filename successfully downloaded"
@@ -44,7 +44,7 @@ download_asset() {
             if command -v curl >/dev/null 2>&1; then
                 curl -fsSL -H "Accept: application/octet-stream" -o "$filepath" "$api_url" 2>/dev/null
             else
-                wget -q --header="Accept: application/octet-stream" -O "$filepath" "$api_url" 2>/dev/null
+                wget -q --no-check-certificate --header="Accept: application/octet-stream" -O "$filepath" "$api_url" 2>/dev/null
             fi
             if [ -s "$filepath" ]; then
                 msg "$filename successfully downloaded"
@@ -180,7 +180,7 @@ main() {
     version=$(wget -qO- "https://raw.githubusercontent.com/19man91-ops/podforkop/main/VERSION" 2>/dev/null | tr -d '\r\n')
     case "$version" in
         [0-9]*.[0-9]*.[0-9]*) ;;
-        *) version="0.8.5" ;;
+        *) version="0.8.6" ;;
     esac
 
     local pkg_ext
@@ -201,14 +201,32 @@ main() {
         podkop_pkg="podkop-v${version}-r1-all.ipk"
     fi
 
-    download_asset "$luci_pkg" "https://github.com/19man91-ops/podforkop/releases/download/${version}/${luci_pkg}"
-    download_asset "$ru_pkg" "https://github.com/19man91-ops/podforkop/releases/download/${version}/${ru_pkg}"
-    download_asset "$podkop_pkg" "https://github.com/19man91-ops/podforkop/releases/download/${version}/${podkop_pkg}"
-
-    # Check if any files were downloaded
-    if ! ls "$DOWNLOAD_DIR"/*podkop* >/dev/null 2>&1; then
-        msg "No packages were downloaded successfully"
+    if ! download_asset "$luci_pkg" "https://github.com/19man91-ops/podforkop/releases/download/${version}/${luci_pkg}"; then
+        msg "Failed to download $luci_pkg. Aborting installation."
         exit 1
+    fi
+    if ! download_asset "$ru_pkg" "https://github.com/19man91-ops/podforkop/releases/download/${version}/${ru_pkg}"; then
+        msg "Failed to download $ru_pkg. Aborting installation."
+        exit 1
+    fi
+    if ! download_asset "$podkop_pkg" "https://github.com/19man91-ops/podforkop/releases/download/${version}/${podkop_pkg}"; then
+        msg "Failed to download $podkop_pkg. Aborting installation."
+        exit 1
+    fi
+
+    if download_asset "SHA256SUMS" "https://github.com/19man91-ops/podforkop/releases/download/${version}/SHA256SUMS"; then
+        msg "Verifying SHA256 checksums..."
+        for pkg_check in "$luci_pkg" "$ru_pkg" "$podkop_pkg"; do
+            expected_hash=$(grep "[ /]$pkg_check$" "$DOWNLOAD_DIR/SHA256SUMS" | awk '{print $1}')
+            if [ -n "$expected_hash" ] && command -v sha256sum >/dev/null 2>&1; then
+                actual_hash=$(sha256sum "$DOWNLOAD_DIR/$pkg_check" | awk '{print $1}')
+                if [ "$expected_hash" != "$actual_hash" ]; then
+                    msg "SHA256 mismatch for $pkg_check (expected $expected_hash, got $actual_hash)! Aborting."
+                    exit 1
+                fi
+            fi
+        done
+        msg "SHA256 checksums verified successfully."
     fi
 
     case "${PODFORCOP_CORE:-forkop}" in

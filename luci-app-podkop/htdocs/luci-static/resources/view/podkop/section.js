@@ -2,6 +2,7 @@
 "require form";
 "require baseclass";
 "require ui";
+"require uci";
 "require tools.widgets as widgets";
 "require view.podkop.main as main";
 
@@ -36,6 +37,45 @@ function createSectionContent(section, singBoxFeatures = []) {
   o.default = "1";
   o.rmempty = false;
   o.editable = true;
+
+  o = section.option(form.DummyValue, "connection_mode", _("Mode"));
+  o.rawhtml = true;
+  o.cfgvalue = function (section_id) {
+    const mode = (uci.get("podkop", section_id, "connection_type") || "proxy").toLowerCase();
+    let label = _("Proxy");
+    let detail = "";
+    let style = "display:inline-block;padding:2px 8px;border-radius:4px;font-weight:600;font-size:12px;";
+
+    if (mode === "vpn") {
+      label = _("VPN");
+      style += "background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.35);";
+      const vpnType = uci.get("podkop", section_id, "vpn_type");
+      if (vpnType) detail = vpnType.toUpperCase();
+    } else if (mode === "block") {
+      label = _("Block");
+      style += "background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.35);";
+    } else if (mode === "exclusion") {
+      label = _("Exclusion");
+      style += "background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid rgba(168,85,247,0.35);";
+    } else {
+      label = _("Proxy");
+      style += "background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.35);";
+      const cfgType = uci.get("podkop", section_id, "proxy_config_type") || "url";
+      const cfgNames = {
+        subscription: _("Subscription"),
+        url: "URL",
+        urltest: "URLTest",
+        selector: "Selector",
+        outbound: "Outbound",
+      };
+      detail = cfgNames[cfgType] || cfgType;
+    }
+
+    const detailHtml = detail
+      ? ` <span style="font-weight:normal;opacity:0.85;font-size:0.9em">(${detail})</span>`
+      : "";
+    return `<span class="badge" style="${style}">${label}${detailHtml}</span>`;
+  };
 
   o = section.option(
     form.ListValue,
@@ -834,6 +874,7 @@ function createSectionContent(section, singBoxFeatures = []) {
   }
   // Keep the enabled flag visible and directly editable in the sections grid.
   section.children[0].modalonly = false;
+  section.children[1].modalonly = false;
 }
 
 const EntryPoint = {

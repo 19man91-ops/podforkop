@@ -1,6 +1,12 @@
 name: Frontend CI
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'fe-app-podkop/**'
+      - '.github/workflows/frontend-ci.yml'
   pull_request:
     paths:
       - 'fe-app-podkop/**'
