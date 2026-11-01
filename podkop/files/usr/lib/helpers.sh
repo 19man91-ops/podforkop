@@ -165,10 +165,12 @@ sing_box_get_features() {
     local features
     features="$(sing-box version 2> /dev/null | sed -n 's/^Features:[[:space:]]*//p')"
     if [ -z "$features" ] && sing_box_uses_subscription_providers; then
-        features="urltest.fallbacks,urltest.download_url,subscription_providers,tools.decode-link"
-        local tags
-        tags="$(sing-box version 2> /dev/null | sed -n 's/^Tags:[[:space:]]*//p')"
-        [ -n "$tags" ] && features="$features,$tags"
+        # sing-box-forkop does not print a "Features:" line. It provides native
+        # subscription providers and parser outbounds, but it does NOT support
+        # urltest fallbacks, urltest download checks or the uTLS fallback option.
+        # Advertising unsupported features makes the UI generate a config that
+        # forkop's strict JSON parser rejects, so only claim what really exists.
+        features="subscription_providers"
     fi
     echo "$features"
 }

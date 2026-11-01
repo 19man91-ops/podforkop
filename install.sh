@@ -28,9 +28,9 @@ download_asset() {
         # 1. Direct release download (not subject to GitHub API rate limits)
         if [ -n "$browser_url" ]; then
             if command -v curl >/dev/null 2>&1; then
-                curl -fsSL -o "$filepath" "$browser_url" 2>/dev/null
+                curl -fsSL --connect-timeout 20 -o "$filepath" "$browser_url" 2>/dev/null
             else
-                wget -q --no-check-certificate -O "$filepath" "$browser_url" 2>/dev/null
+                wget -q -O "$filepath" "$browser_url" 2>/dev/null
             fi
             if [ -s "$filepath" ]; then
                 msg "$filename successfully downloaded"
@@ -42,9 +42,9 @@ download_asset() {
         # 2. GitHub API asset download fallback
         if [ -n "$api_url" ]; then
             if command -v curl >/dev/null 2>&1; then
-                curl -fsSL -H "Accept: application/octet-stream" -o "$filepath" "$api_url" 2>/dev/null
+                curl -fsSL --connect-timeout 20 -H "Accept: application/octet-stream" -o "$filepath" "$api_url" 2>/dev/null
             else
-                wget -q --no-check-certificate --header="Accept: application/octet-stream" -O "$filepath" "$api_url" 2>/dev/null
+                wget -q --header="Accept: application/octet-stream" -O "$filepath" "$api_url" 2>/dev/null
             fi
             if [ -s "$filepath" ]; then
                 msg "$filename successfully downloaded"
@@ -59,6 +59,8 @@ download_asset() {
     done
 
     msg "Failed to download $filename after $COUNT attempts"
+    msg "Check internet access, DNS and the router clock. GitHub uses HTTPS:"
+    msg "if TLS verification fails, install the CA bundle: opkg update && opkg install ca-bundle"
     return 1
 }
 
@@ -180,7 +182,7 @@ main() {
     version=$(wget -qO- "https://raw.githubusercontent.com/19man91-ops/podforkop/main/VERSION" 2>/dev/null | tr -d '\r\n')
     case "$version" in
         [0-9]*.[0-9]*.[0-9]*) ;;
-        *) version="0.9.2" ;;
+        *) version="0.9.3" ;;
     esac
 
     local pkg_ext
@@ -214,20 +216,30 @@ main() {
         exit 1
     fi
 
-    if download_asset "SHA256SUMS" "https://github.com/19man91-ops/podforkop/releases/download/${version}/SHA256SUMS"; then
-        msg "Verifying SHA256 checksums..."
-        for pkg_check in "$luci_pkg" "$ru_pkg" "$podkop_pkg"; do
-            expected_hash=$(grep "[ /]$pkg_check$" "$DOWNLOAD_DIR/SHA256SUMS" | awk '{print $1}')
-            if [ -n "$expected_hash" ] && command -v sha256sum >/dev/null 2>&1; then
-                actual_hash=$(sha256sum "$DOWNLOAD_DIR/$pkg_check" | awk '{print $1}')
-                if [ "$expected_hash" != "$actual_hash" ]; then
-                    msg "SHA256 mismatch for $pkg_check (expected $expected_hash, got $actual_hash)! Aborting."
-                    exit 1
-                fi
-            fi
-        done
-        msg "SHA256 checksums verified successfully."
+    if ! download_asset "SHA256SUMS" "https://github.com/19man91-ops/podforkop/releases/download/${version}/SHA256SUMS"; then
+        msg "Failed to download SHA256SUMS. Aborting to avoid installing unverified packages."
+        exit 1
     fi
+
+    if ! command -v sha256sum >/dev/null 2>&1; then
+        msg "sha256sum is not available (busybox sha256sum is expected). Aborting to avoid installing unverified packages."
+        exit 1
+    fi
+
+    msg "Verifying SHA256 checksums..."
+    for pkg_check in "$luci_pkg" "$ru_pkg" "$podkop_pkg"; do
+        expected_hash=$(grep "[ /]$pkg_check$" "$DOWNLOAD_DIR/SHA256SUMS" | awk '{print $1}')
+        if [ -z "$expected_hash" ]; then
+            msg "SHA256SUMS has no entry for $pkg_check. Aborting."
+            exit 1
+        fi
+        actual_hash=$(sha256sum "$DOWNLOAD_DIR/$pkg_check" | awk '{print $1}')
+        if [ "$expected_hash" != "$actual_hash" ]; then
+            msg "SHA256 mismatch for $pkg_check (expected $expected_hash, got $actual_hash)! Aborting."
+            exit 1
+        fi
+    done
+    msg "SHA256 checksums verified successfully."
 
     case "${PODFORCOP_CORE:-forkop}" in
         forkop)
@@ -252,10 +264,18 @@ main() {
         done
         if [ -n "$file" ]; then
             msg "Installing $file..."
-            pkg_install "$DOWNLOAD_DIR/$file"
+            if ! pkg_install "$DOWNLOAD_DIR/$file"; then
+                msg "Failed to install $file. Aborting."
+                exit 1
+            fi
             sleep 3
         fi
     done
+
+    if ! pkg_is_installed podkop || ! pkg_is_installed luci-app-podkop; then
+        msg "Podkop packages are not installed after the installation step. Aborting."
+        exit 1
+    fi
 
     ru=""
     for f in "$DOWNLOAD_DIR"/luci-i18n-podkop-ru*; do
@@ -268,7 +288,10 @@ main() {
         if pkg_is_installed luci-i18n-podkop-ru; then
                 msg "Upgrading Russian translation..."
                 pkg_remove luci-i18n-podkop-ru
-                pkg_install "$DOWNLOAD_DIR/$ru"
+                if ! pkg_install "$DOWNLOAD_DIR/$ru"; then
+                    msg "Failed to install Russian translation. Aborting."
+                    exit 1
+                fi
         else
             msg "Русский язык интерфейса ставим? y/n (Install the Russian interface language?)"
             while true; do
@@ -276,7 +299,10 @@ main() {
                 case $RUS in
                 y)
                     pkg_remove luci-i18n-podkop-ru
-                    pkg_install "$DOWNLOAD_DIR/$ru"
+                    if ! pkg_install "$DOWNLOAD_DIR/$ru"; then
+                        msg "Failed to install Russian translation. Aborting."
+                        exit 1
+                    fi
                     break
                     ;;
                 n)
@@ -290,7 +316,16 @@ main() {
         fi
     fi
 
-    find "$DOWNLOAD_DIR" -type f -name '*podkop*' -exec rm {} \;
+    # Enable autostart so Podkop survives a reboot. The service itself is
+    # started by the LuCI Save & Apply handler once the user has a config.
+    if ! /etc/init.d/podkop enable >/dev/null 2>&1; then
+        msg "Warning: could not enable Podkop autostart. Run: /etc/init.d/podkop enable"
+    fi
+
+    rm -rf "$DOWNLOAD_DIR"
+
+    msg "Podkop installation finished."
+    msg "Open LuCI -> Services -> Podkop, configure a section and press Save & Apply."
 }
 
 get_package_arch() {

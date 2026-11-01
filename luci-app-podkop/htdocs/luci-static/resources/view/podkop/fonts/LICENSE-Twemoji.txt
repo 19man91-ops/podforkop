@@ -1,0 +1,12 @@
+Twemoji Country Flags font
+==========================
+
+This font is part of the Twemoji Country Flags project:
+https://github.com/twitter/twemoji
+
+Copyright 2020 Twitter, Inc and other contributors.
+Graphics licensed under CC-BY 4.0: https://creativecommons.org/licenses/by/4.0/
+Font licensed under SIL Open Font License 1.1 where applicable.
+
+The font is bundled with PodForCOP solely to render country flag glyphs in the
+LuCI interface.

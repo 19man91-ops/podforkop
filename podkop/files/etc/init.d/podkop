@@ -41,7 +41,11 @@ service_triggers() {
     PROCD_RELOAD_DELAY=$badwan_reload_delay
 
     procd_open_trigger
-    procd_add_reload_trigger "podkop"
+    # Do not register a reload trigger for /etc/config/podkop: the LuCI
+    # Save & Apply handler already restarts the service explicitly, and the
+    # reload trigger caused a second full restart (and races in nftables /
+    # dnsmasq) on every apply. CLI users keep "service podkop reload".
+    # The badwan interface triggers below are still required.
 
     if [ "$enable_badwan_interface_monitoring" = "1" ]; then
         for iface in $badwan_monitored_interfaces; do

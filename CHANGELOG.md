@@ -1,0 +1,52 @@
+# Changelog
+
+## 0.9.3
+
+### Исправлено
+- **Фальшивые возможности ядра для sing-box-forkop.** `sing_box_get_features` больше не объявляет
+  `urltest.fallbacks`, `urltest.download_url` и `tools.decode-link` для forkop; UI скрывает
+  неподдерживаемые настройки, а генератор конфига их пропускает. Раньше их включение давало
+  невалидный JSON и Podkop не запускался.
+- **`providers: []` на не-forkop ядрах.** Защита в `sing_box_cm_add_group_providers` теперь
+  отсекает не только пустую строку, но и литерал `"[]"`; вызывающий код инициализирует
+  теги провайдеров пустой строкой. Selector/URLTest больше не ломают `podkop-engine` и stock sing-box.
+- **DNS failover на неподдерживающем ядре.** При нескольких DNS-серверах на не-forkop ядре
+  используется первый сервер, а в лог пишется предупреждение вместо генерации невалидного конфига.
+- **Утечка секретов в диагностике.** `show_sing_box_config` и `check_proxy` маскируют поле
+  `link` parser-outbound и `providers[].url/path`.
+- **Мониторинг, «Закрыть все».** Исправлен вызов несуществующего метода
+  `closeAllClashApiConnections` (правильный — `closeClashApiConnections`).
+- **Дашборд URL-подписок.** Сравнение типа Clash API `Selector` исправлено (было `selector`).
+- **Двойной рестарт на Save & Apply.** Удалён дублирующий procd reload-trigger: остаётся один
+  явный перезапуск из обработчика LuCI.
+- **Drag & Drop.** При наличии штатного LuCI sortable используется он; собственная реализация
+  остаётся только для старых LuCI. Двойные обработчики больше не конфликтуют.
+- **Мёртвые команды.** Удалены несуществующие `main` и `check_sing_box_logs` из CLI и справки;
+  добавлены рабочие `podkop enable` / `podkop disable`, а `podkop status` работает как
+  псевдоним `get_status`.
+- **Сообщение о версии sing-box** в диагностике использует `SB_REQUIRED_VERSION` вместо
+  захардкоженного `1.12.4`.
+- **`has_outbound_section`** учитывает флаг `enabled` секции.
+- **TypeScript**: исправлены все ошибки `tsc --noEmit` (декларация `rpc`, типы ответов
+  `MethodResponse`, `ConfigSection.label`, `getSingBoxFeatures`).
+
+### Улучшено
+- **Безопасность установщика**: убран `--no-check-certificate` (TLS проверяется всегда),
+  `SHA256SUMS` обязателен и проверяется для всех пакетов, установка прерывается при ошибке
+  установки любого пакета, выполняется финальная проверка `podkop`/`luci-app-podkop`.
+- **Автозапуск**: установщик выполняет `/etc/init.d/podkop enable`, поэтому служба переживает
+  перезагрузку; итоговое сообщение подсказывает открыть LuCI и нажать Save & Apply.
+- **`update-fast.sh`** переписан: staging-каталог, все файлы (включая `monitoring.js`,
+  `dashboard.js`, `diagnostic.js` и все библиотеки), правильные пути `/usr/lib/podkop/`,
+  источники из тега установленной версии, TLS без отключения проверки.
+- **Кэш подписок**: для forkop включён `cache_file.store_subscriptions` — провайдеры
+  поднимаются из кэша при недоступности сервера подписок.
+- **CI**: добавлены `tsc --noEmit` и `prettier --check`, используется `yarn install --frozen-lockfile`,
+  добавлена проверка соответствия git-тега и `VERSION`.
+- **Локализация**: добавлены 13 отсутствовавших msgid (Mode, Monitoring, Proxy, VPN, Block,
+  Exclusion, строки модального окна применения и др.) в pot/po обоих пайплайнов.
+- **Документация**: README исправлен (GPL-2.0-or-later, `podkop get_status`, opkg 24.10 / apk 25.12+,
+  автозапуск, ограничения альтернативного ядра), добавлена атрибуция шрифта Twemoji (CC-BY 4.0).
+
+### Зависимости
+- Ядро `sing-box-forkop v1.14.4-r1` (подписки/providers, parser, DNS fallback, XHTTP).

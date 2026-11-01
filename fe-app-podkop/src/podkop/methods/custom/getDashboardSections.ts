@@ -50,7 +50,7 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
           );
 
           if (
-            outbound?.value?.type === 'selector' &&
+            outbound?.value?.type === 'Selector' &&
             (outbound?.value?.all?.length ?? 0) > 0
           ) {
             const allCodes = outbound.value.all ?? [];

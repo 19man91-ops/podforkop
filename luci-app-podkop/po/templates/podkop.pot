@@ -1213,3 +1213,63 @@ msgstr ""
 #: ..\luci-app-podkop\htdocs\luci-static\resources\view\podkop\settings.js:127
 msgid "You can select Output Network Interface, by default autodetect"
 msgstr ""
+
+msgid "Applying changes"
+msgstr ""
+
+msgid "Applying configuration and restarting Podkop service..."
+msgstr ""
+
+msgid "Block"
+msgstr ""
+
+msgid "Enter subnets in CIDR notation or single IP addresses, separated by commas, spaces, or newlines. "
+msgstr ""
+
+msgid "Exclusion"
+msgstr ""
+
+msgid "Failed to apply changes"
+msgstr ""
+
+msgid "Mode"
+msgstr ""
+
+msgid "Monitoring"
+msgstr ""
+
+msgid "Proxy"
+msgstr ""
+
+msgid "Restarting Podkop service..."
+msgstr ""
+
+msgid "Restarting service"
+msgstr ""
+
+msgid "Specify the port number on which the mixed proxy will run for this section. "
+msgstr ""
+
+msgid "VPN"
+msgstr ""
+
+msgid "Several servers give automatic failover. Select or enter DNS server address"
+msgstr ""
+
+msgid "Main DNS Query Mode"
+msgstr ""
+
+msgid "Sequential asks every server in turn until the first answer (automatic failover). Parallel asks every server at once and returns the fastest answer"
+msgstr ""
+
+msgid "Sequential (automatic failover)"
+msgstr ""
+
+msgid "Parallel (fastest response)"
+msgstr ""
+
+msgid "The DNS server used to look up the IP address of an upstream DNS server. Several servers give automatic failover"
+msgstr ""
+
+msgid "Bootstrap DNS Query Mode"
+msgstr ""

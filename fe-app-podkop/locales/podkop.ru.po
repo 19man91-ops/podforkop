@@ -844,3 +844,93 @@ msgstr "Секретный ключ YACD"
 
 msgid "You can select Output Network Interface, by default autodetect"
 msgstr "Вы можете выбрать выходной сетевой интерфейс, по умолчанию он определяется автоматически."
+
+msgid "Applying changes"
+msgstr "Применение изменений"
+
+msgid "Applying configuration and restarting Podkop service..."
+msgstr "Применение конфигурации и перезапуск службы Podkop..."
+
+msgid "Block"
+msgstr "Блокировка"
+
+msgid "Enter subnets in CIDR notation or single IP addresses, separated by commas, spaces, or newlines. "
+msgstr "Введите подсети в нотации CIDR или отдельные IP-адреса, разделённые запятыми, пробелами или переводами строк. "
+
+msgid "Exclusion"
+msgstr "Исключение"
+
+msgid "Failed to apply changes"
+msgstr "Не удалось применить изменения"
+
+msgid "Mode"
+msgstr "Режим"
+
+msgid "Monitoring"
+msgstr "Мониторинг"
+
+msgid "Proxy"
+msgstr "Прокси"
+
+msgid "Restarting Podkop service..."
+msgstr "Перезапуск службы Podkop..."
+
+msgid "Restarting service"
+msgstr "Перезапуск службы"
+
+msgid "Specify the port number on which the mixed proxy will run for this section. "
+msgstr "Укажите номер порта, на котором будет работать mixed-прокси для этой секции. "
+
+msgid "VPN"
+msgstr "VPN"
+
+msgid "Drag row with mouse to reorder sections"
+msgstr "Перетащите строку мышью, чтобы изменить порядок секций"
+
+msgid "Select a section to edit its connection and traffic rules. Drag rows with mouse to reorder rules precedence."
+msgstr "Выберите секцию, чтобы настроить подключение и правила маршрутизации. Перетаскивайте строки мышью, чтобы изменить приоритет правил."
+
+msgid "Enable or disable this section without deleting its configuration"
+msgstr "Включайте и отключайте секцию, не удаляя её настройки"
+
+msgid "Subscription"
+msgstr "Подписка"
+
+msgid "Subscription Sources"
+msgstr "Источники подписки"
+
+msgid "HTTP(S) subscription links or absolute router file paths. Supports proxy links, Base64, Clash/Mihomo, sing-box, Xray and SIP008 formats; refreshed using the global update frequency"
+msgstr "HTTP(S)-ссылки на подписки или абсолютные пути к файлам на роутере. Поддерживаются ссылки прокси, Base64, Clash/Mihomo, sing-box, Xray и SIP008; обновление выполняется с общей периодичностью"
+
+msgid "The available proxy protocols depend on the installed sing-box-forkop build"
+msgstr "Доступные протоколы прокси зависят от установленной сборки sing-box-forkop"
+
+msgid "Links supported by the installed sing-box-forkop build. Direct links and subscriptions can be combined."
+msgstr "Поддерживаемые установленной сборкой sing-box-forkop ссылки. Прямые ссылки и подписки можно использовать вместе."
+
+msgid "Selector Subscription Sources"
+msgstr "Источники подписок для Selector"
+
+msgid "URLTest Subscription Sources"
+msgstr "Источники подписок для URLTest"
+
+msgid "Several servers give automatic failover. Select or enter DNS server address"
+msgstr "Несколько серверов обеспечивают автоматическое переключение. Выберите или введите адрес DNS-сервера"
+
+msgid "Main DNS Query Mode"
+msgstr "Режим запросов основного DNS"
+
+msgid "Sequential asks every server in turn until the first answer (automatic failover). Parallel asks every server at once and returns the fastest answer"
+msgstr "Последовательно опрашивает серверы по очереди (автопереключение). Параллельно опрашивает все сразу (быстрый ответ)"
+
+msgid "Sequential (automatic failover)"
+msgstr "Последовательно (автоматическое переключение)"
+
+msgid "Parallel (fastest response)"
+msgstr "Параллельно (быстрый ответ)"
+
+msgid "The DNS server used to look up the IP address of an upstream DNS server. Several servers give automatic failover"
+msgstr "DNS-сервер для поиска адреса вышестоящего DNS. Несколько серверов обеспечивают автоматическое переключение"
+
+msgid "Bootstrap DNS Query Mode"
+msgstr "Режим запросов Bootstrap DNS"

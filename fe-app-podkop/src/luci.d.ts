@@ -34,10 +34,18 @@ declare global {
     sections: (conf: string, type?: string, cb?: () => void) => Promise<T>;
   };
 
+  const rpc: {
+    declare: (options: {
+      object: string;
+      method: string;
+      expect?: Record<string, unknown>;
+    }) => () => Promise<unknown>;
+  };
+
   const _ = (_key: string) => string;
 
   const ui = {
-    showModal: (_title: stirng, _content: HtmlElement) => undefined,
+    showModal: (_title: string, _content: HtmlElement) => undefined,
     hideModal: () => undefined,
     addNotification: (
       _title: string,

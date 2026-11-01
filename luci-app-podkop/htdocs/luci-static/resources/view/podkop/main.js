@@ -813,7 +813,7 @@ async function getDashboardSections() {
         const outbound = proxies.find(
           (proxy) => proxy.code === `${section[".name"]}-out`
         );
-        if (outbound?.value?.type === "selector" && (outbound?.value?.all?.length ?? 0) > 0) {
+        if (outbound?.value?.type === "Selector" && (outbound?.value?.all?.length ?? 0) > 0) {
           const allCodes = outbound.value.all ?? [];
           const outbounds = allCodes.map((code) => {
             const node = proxies.find((p) => p.code === code);
@@ -1041,8 +1041,8 @@ async function getClashApiSecret() {
 
 // src/podkop/methods/custom/getSingBoxFeatures.ts
 async function getSingBoxFeatures() {
-  const { data, success } = await PodkopShellMethods.getSingBoxFeatures();
-  return success && Array.isArray(data) ? data : [];
+  const response = await PodkopShellMethods.getSingBoxFeatures();
+  return response.success && Array.isArray(response.data) ? response.data : [];
 }
 
 // src/helpers/getClashApiUrl.ts
@@ -1105,7 +1105,7 @@ async function closeClashApiConnection(id) {
         }
       );
       if (res.ok || res.status === 204) {
-        return { success: true };
+        return { success: true, data: null };
       }
     } catch {
       directSuspended = true;
@@ -1124,13 +1124,13 @@ async function closeAllClashApiConnections() {
         headers
       });
       if (res.ok || res.status === 204) {
-        return { success: true };
+        return { success: true, data: null };
       }
     } catch {
       directSuspended = true;
     }
   }
-  return PodkopShellMethods.closeAllClashApiConnections();
+  return PodkopShellMethods.closeClashApiConnections();
 }
 
 // src/podkop/methods/custom/index.ts

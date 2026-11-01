@@ -31,6 +31,12 @@ function enableRowDragAndDrop(containerNode) {
       containerNode.querySelector(".cbi-section-table");
     if (!table) return;
 
+    // Modern LuCI already implements sortable tables natively (drag handle in
+    // the actions column, persisted to UCI). Do not attach a second DnD
+    // implementation on top of it: duplicated handlers cancel each other and
+    // can reorder sections twice.
+    if (table.querySelector(".drag-handle")) return;
+
     const tbody = table.querySelector("tbody") || table;
     const rows = tbody.querySelectorAll(".cbi-section-table-row");
 

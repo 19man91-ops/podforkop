@@ -48,7 +48,7 @@ export async function closeClashApiConnection(
         },
       );
       if (res.ok || res.status === 204) {
-        return { success: true };
+        return { success: true, data: null };
       }
     } catch {
       directSuspended = true;
@@ -70,11 +70,11 @@ export async function closeAllClashApiConnections(): Promise<
         headers,
       });
       if (res.ok || res.status === 204) {
-        return { success: true };
+        return { success: true, data: null };
       }
     } catch {
       directSuspended = true;
     }
   }
-  return PodkopShellMethods.closeAllClashApiConnections();
+  return PodkopShellMethods.closeClashApiConnections();
 }

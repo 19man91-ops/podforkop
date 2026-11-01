@@ -1096,10 +1096,15 @@ sing_box_cm_add_group_providers() {
     local group_tag="$2"
     local providers="$3"
 
-    [ -n "$providers" ] || {
+    # Callers initialize the provider tag list to "[]" while no subscription
+    # providers are configured. Passing that literal to a stock sing-box (and
+    # to older cores) adds an unknown "providers" field and breaks the config.
+    case "$providers" in
+    "" | "[]")
         echo "$config"
         return 0
-    }
+        ;;
+    esac
 
     echo "$config" | jq \
         --arg tag "$group_tag" \
@@ -1537,26 +1542,29 @@ sing_box_cm_add_remote_ruleset() {
 #   enabled: boolean, enable or disable file caching
 #   path: string, file path for cache storage
 #   store_fakeip: boolean, whether to store fake IPs in the cache
+#   store_subscriptions: boolean, whether to cache provider subscriptions (forkop only, optional)
 # Outputs:
 #   Writes updated JSON configuration to stdout
 # Example:
-#   CONFIG=$(sing_box_cm_configure_cache_file "$CONFIG" true "/tmp/cache.db" true)
+#   CONFIG=$(sing_box_cm_configure_cache_file "$CONFIG" true "/tmp/cache.db" true true)
 #######################################
 sing_box_cm_configure_cache_file() {
     local config="$1"
     local enabled="$2"
     local path="$3"
     local store_fakeip="$4"
+    local store_subscriptions="${5:-false}"
 
     echo "$config" | jq \
         --argjson enabled "$enabled" \
         --arg path "$path" \
         --argjson store_fakeip "$store_fakeip" \
-        '.experimental.cache_file = {
+        --argjson store_subscriptions "$store_subscriptions" \
+        '.experimental.cache_file = ({
             enabled: $enabled,
             path: $path,
             store_fakeip: $store_fakeip
-        }'
+        } + (if $store_subscriptions then { store_subscriptions: true } else {} end))'
 }
 
 #######################################

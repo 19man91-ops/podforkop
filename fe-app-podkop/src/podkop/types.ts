@@ -28,14 +28,12 @@ export namespace Podkop {
   // restart                 Restart podkop service
   // enable                  Enable podkop autostart
   // disable                 Disable podkop autostart
-  // main                    Run main podkop process
   // list_update             Update domain lists
   // check_proxy             Check proxy connectivity
   // check_nft               Check NFT rules
   // check_nft_rules         Check NFT rules status
   // check_sing_box          Check sing-box installation and status
   // check_logs              Show podkop logs from system journal
-  // check_sing_box_logs     Show sing-box logs
   // check_fakeip            Test FakeIP on router
   // clash_api               Clash API interface for managing proxies and groups
   // show_config             Display current podkop configuration
@@ -179,6 +177,7 @@ export namespace Podkop {
     '.name': string;
     '.type': 'settings' | 'section';
     enabled?: string;
+    label?: string;
     yacd_secret_key?: string;
   };
 

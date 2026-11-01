@@ -22,6 +22,15 @@ jobs:
         run: |
           VERSION=$(git describe --tags --exact-match 2>/dev/null || echo "0.$(date +%d%m%Y)")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Verify VERSION matches tag
+        if: github.ref_type == 'tag'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(cat VERSION)"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Git tag $GITHUB_REF_NAME does not match VERSION=$version. Bump VERSION in the release commit."
+            exit 1
+          fi
 
   frontend-test:
     name: Frontend Tests
@@ -34,10 +43,20 @@ jobs:
       - uses: actions/setup-node@v5.0.0
         with:
           node-version: '22'
-      - run: npm install
-      - run: npm run lint -- --max-warnings=0
-      - run: npm test -- --run
-      - run: npm run build
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Type check
+        run: yarn typecheck
+      - name: Check formatting
+        run: yarn format:check
+      - name: Lint
+        run: yarn lint --max-warnings=0
+      - name: Test
+        run: yarn test --run
+      - name: Build bundle
+        run: yarn build
 
   build:
     name: Builder for ${{ matrix.package_type }} podkop and luci-app-podkop

@@ -88,6 +88,10 @@ check_requirements() {
 _check_outbound_section() {
     local section="$1"
     local proxy_string interface outbound_json selector_proxy_links urltest_proxy_links selector_subscription_urls urltest_subscription_urls subscription_urls
+    local enabled
+
+    config_get_bool enabled "$section" "enabled" 1
+    [ "$enabled" -eq 1 ] || return 0
 
     config_get proxy_string "$section" "proxy_string"
     config_get selector_proxy_links "$section" "selector_proxy_links"
@@ -715,7 +719,7 @@ configure_outbound_handler() {
                 config_get selector_subscription_urls "$section" "subscription_urls"
             fi
             config_get udp_over_tcp "$section" "enable_udp_over_tcp"
-            local selector_provider_tags="[]"
+            local selector_provider_tags=""
             if sing_box_uses_subscription_providers; then
                 configure_subscription_providers "$section" "$proxy_config_type" "$selector_subscription_urls"
                 selector_provider_tags="$PODKOP_SUBSCRIPTION_PROVIDER_TAGS"
@@ -724,7 +728,7 @@ configure_outbound_handler() {
                 selector_proxy_links="$selector_proxy_links $subscription_links"
             fi
 
-            if [ -z "$selector_proxy_links" ] && [ "$selector_provider_tags" = "[]" ]; then
+            if [ -z "$selector_proxy_links" ] && [ -z "$selector_provider_tags" ]; then
                 log "Proxy links and subscription sources are not set for section $section. Aborted." "fatal"
                 exit 1
             fi
@@ -752,7 +756,7 @@ configure_outbound_handler() {
             done
             [ "$old_noglob" = "1" ] || set +f
 
-            if [ -z "$outbound_tags" ] && [ "$selector_provider_tags" = "[]" ]; then
+            if [ -z "$outbound_tags" ] && [ -z "$selector_provider_tags" ]; then
                 log "Section $section has no proxy links supported by the installed sing-box. Aborted." "fatal"
                 exit 1
             fi
@@ -778,7 +782,7 @@ configure_outbound_handler() {
             config_get urltest_testing_url "$section" "urltest_testing_url" "https://www.gstatic.com/generate_204"
             config_get urltest_download_check "$section" "urltest_download_check" "default"
             config_get urltest_download_url "$section" "urltest_download_url"
-            local urltest_provider_tags="[]"
+            local urltest_provider_tags=""
             if sing_box_uses_subscription_providers; then
                 configure_subscription_providers "$section" urltest "$urltest_subscription_urls"
                 urltest_provider_tags="$PODKOP_SUBSCRIPTION_PROVIDER_TAGS"
@@ -787,7 +791,7 @@ configure_outbound_handler() {
                 urltest_proxy_links="$urltest_proxy_links $subscription_links"
             fi
 
-            if [ -z "$urltest_proxy_links" ] && [ "$urltest_provider_tags" = "[]" ]; then
+            if [ -z "$urltest_proxy_links" ] && [ -z "$urltest_provider_tags" ]; then
                 log "URLTest proxy links is not set. Aborted." "fatal"
                 exit 1
             fi
@@ -840,7 +844,7 @@ configure_outbound_handler() {
             done
             [ "$old_noglob" = "1" ] || set +f
 
-            if [ -z "$outbound_tags" ] && [ "$urltest_provider_tags" = "[]" ]; then
+            if [ -z "$outbound_tags" ] && [ -z "$urltest_provider_tags" ]; then
                 log "Section $section has no proxy links supported by the installed sing-box. Aborted." "fatal"
                 exit 1
             fi
@@ -937,6 +941,12 @@ sing_box_configure_dns() {
         bs_count=$((bs_count + 1))
     done
 
+    if [ "$bs_count" -gt 1 ] && ! sing_box_uses_subscription_providers; then
+        log "Multiple bootstrap DNS servers require sing-box-forkop. Using only the first server: ${bootstrap_servers%% *}" "warn"
+        bootstrap_servers="${bootstrap_servers%% *}"
+        bs_count=1
+    fi
+
     if [ "$bs_count" -le 1 ]; then
         local s="${bootstrap_servers:-77.88.8.8}"
         config=$(sing_box_cm_add_udp_dns_server "$config" "$SB_BOOTSTRAP_SERVER_TAG" "$s" 53)
@@ -970,6 +980,12 @@ sing_box_configure_dns() {
     for s in $main_servers; do
         ms_count=$((ms_count + 1))
     done
+
+    if [ "$ms_count" -gt 1 ] && ! sing_box_uses_subscription_providers; then
+        log "Multiple main DNS servers require sing-box-forkop. Using only the first server: ${main_servers%% *}" "warn"
+        main_servers="${main_servers%% *}"
+        ms_count=1
+    fi
 
     if [ "$ms_count" -le 1 ]; then
         local s="${main_servers:-77.88.8.8}"
@@ -1399,9 +1415,16 @@ sing_box_configure_experimental() {
     log "Configure the experimental section of a sing-box JSON configuration"
 
     log "Configuring cache database"
-    local cache_file
+    local cache_file store_subscriptions
     config_get cache_file "settings" "cache_path" "/tmp/sing-box/cache.db"
-    config=$(sing_box_cm_configure_cache_file "$config" true "$cache_file" true)
+    store_subscriptions=false
+    if sing_box_uses_subscription_providers; then
+        # Persist remote/local provider subscriptions in the cache, so that
+        # forkop can start (and route) even when the subscription server is
+        # unreachable at boot.
+        store_subscriptions=true
+    fi
+    config=$(sing_box_cm_configure_cache_file "$config" true "$cache_file" true "$store_subscriptions")
 
     log "Configuring Clash API"
     local enable_yacd enable_yacd_wan_access clash_api_controller_address
@@ -1948,9 +1971,13 @@ check_proxy() {
                     .value = "MASKED"
                 elif .key == "server_port" then
                     .value = "MASKED"
+                elif .key == "link" then
+                    .value = "MASKED"
                 else . end
             )
         else . end
+    ) | .providers |= map(
+        if has("url") then .url = "MASKED" elif has("path") then .path = "MASKED" else . end
     )' "$sing_box_config_path"
 
     nolog "Checking proxy connection..."
@@ -2108,6 +2135,8 @@ show_sing_box_config() {
                 elif .key == "fingerprint" then
                     .value = "MASKED"
                 elif .key == "server_port" then
+                    .value = "MASKED"
+                elif .key == "link" then
                     .value = "MASKED"
                 else . end
             )
@@ -2461,11 +2490,11 @@ check_sing_box() {
     if command -v sing-box > /dev/null 2>&1; then
         sing_box_installed=1
 
-        # Check version (must be >= 1.12.4)
+        # Check version (must be >= $SB_REQUIRED_VERSION)
         local version
         version=$(sing-box version 2> /dev/null | head -n 1 | awk '{print $3}')
         version="${version#v}"
-        if [ -n "$version" ] && is_min_package_version "$version" "1.12.4"; then
+        if [ -n "$version" ] && is_min_package_version "$version" "$SB_REQUIRED_VERSION"; then
             sing_box_version_ok=1
         fi
     fi
@@ -2776,9 +2805,9 @@ global_check() {
         fi
 
         if [ "$sing_box_version_ok" -eq 1 ]; then
-            print_global "✅ Sing-box version is compatible (newer than 1.12.4)"
+            print_global "✅ Sing-box version is compatible (newer than $SB_REQUIRED_VERSION)"
         else
-            print_global "❌ Sing-box version is not compatible (older than 1.12.4)"
+            print_global "❌ Sing-box version is not compatible (older than $SB_REQUIRED_VERSION)"
         fi
 
         if [ "$sing_box_service_exist" -eq 1 ]; then
@@ -2993,7 +3022,8 @@ Available commands:
     stop                    Stop podkop service
     reload                  Reload podkop configuration
     restart                 Restart podkop service
-    main                    Run main podkop process
+    enable                  Enable podkop autostart
+    disable                 Disable podkop autostart
     list_update             Update domain lists
     subscription_update     Update proxy subscriptions
     check_proxy             Check proxy connectivity
@@ -3001,7 +3031,6 @@ Available commands:
     check_nft_rules         Check NFT rules status
     check_sing_box          Check sing-box installation and status
     check_logs              Show podkop logs from system journal
-    check_sing_box_logs     Show sing-box logs
     check_fakeip            Test FakeIP on router
     clash_api               Clash API interface for managing proxies and groups
     show_config             Display current podkop configuration
@@ -3010,6 +3039,7 @@ Available commands:
     show_sing_box_version   Show sing-box version
     show_system_info        Show system information
     get_status              Get podkop service status
+    status                  Alias for get_status
     get_sing_box_status     Get sing-box service status
     get_system_info         Get system information in JSON format
     get_sing_box_features   Get the features of the installed sing-box in JSON format
@@ -3031,8 +3061,11 @@ reload)
 restart)
     restart
     ;;
-main)
-    main
+enable)
+    /etc/init.d/podkop enable
+    ;;
+disable)
+    /etc/init.d/podkop disable
     ;;
 list_update)
     list_update
@@ -3054,9 +3087,6 @@ check_sing_box)
     ;;
 check_logs)
     check_logs
-    ;;
-check_sing_box_logs)
-    check_sing_box_logs
     ;;
 check_fakeip)
     check_fakeip
@@ -3080,6 +3110,9 @@ show_system_info)
     show_system_info
     ;;
 get_status)
+    get_status
+    ;;
+status)
     get_status
     ;;
 get_sing_box_status)
