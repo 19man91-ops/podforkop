@@ -72,6 +72,11 @@ pkg_install() {
 }
 
 update_config() {
+    if [ -f "/etc/config/podkop-070" ]; then
+        msg "Existing /etc/config/podkop-070 backup found. Keeping it and the current Podkop config."
+        return
+    fi
+
     printf "\033[48;5;196m\033[1m╔══════════════════════════════════════════════════════════════════════╗\033[0m\n"
     printf "\033[48;5;196m\033[1m║ ! Обнаружена старая версия podkop.                                   ║\033[0m\n"
     printf "\033[48;5;196m\033[1m║ Если продолжите обновление, вам потребуется настроить Podkop заново. ║\033[0m\n"
@@ -228,13 +233,11 @@ main() {
 get_package_arch() {
     local arch
 
-    if [ "$PKG_IS_APK" -eq 1 ]; then
+    arch=$(sed -n "s/^DISTRIB_ARCH='\([^']*\)'.*/\1/p" /etc/openwrt_release)
+    if [ -z "$arch" ] && [ "$PKG_IS_APK" -eq 1 ]; then
         arch=$(apk --print-arch 2>/dev/null)
-    else
-        arch=$(sed -n "s/^DISTRIB_ARCH='\([^']*\)'.*/\1/p" /etc/openwrt_release)
-        if [ -z "$arch" ]; then
-            arch=$(opkg print-architecture | awk '$1 == "arch" && $2 != "all" && $2 != "noarch" { value=$2 } END { print value }')
-        fi
+    elif [ -z "$arch" ]; then
+        arch=$(opkg print-architecture | awk '$1 == "arch" && $2 != "all" && $2 != "noarch" { value=$2 } END { print value }')
     fi
 
     case "$arch" in
