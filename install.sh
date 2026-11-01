@@ -178,7 +178,10 @@ main() {
 
     local version=""
     version=$(wget -qO- "https://raw.githubusercontent.com/19man91-ops/podforkop/main/VERSION" 2>/dev/null | tr -d '\r\n')
-    [ -n "$version" ] || version="0.8.4"
+    case "$version" in
+        [0-9]*.[0-9]*.[0-9]*) ;;
+        *) version="0.8.4" ;;
+    esac
 
     local pkg_ext
     if [ "$PKG_IS_APK" -eq 1 ]; then
