@@ -4,12 +4,10 @@ import { validateIPV4 } from './validateIp';
 
 export function validateSocksUrl(url: string): ValidationResult {
   try {
-    if (!/^socks(4|4a|5):\/\//.test(url)) {
+    if (!/^socks(4|4a|5h?):\/\//.test(url) && !/^socks:\/\//.test(url)) {
       return {
         valid: false,
-        message: _(
-          'Invalid SOCKS URL: must start with socks4://, socks4a://, or socks5://',
-        ),
+        message: _('Invalid URL format'),
       };
     }
 
@@ -20,7 +18,7 @@ export function validateSocksUrl(url: string): ValidationResult {
       };
     }
 
-    const body = url.replace(/^socks(4|4a|5):\/\//, '');
+    const body = url.replace(/^socks(?:4|4a|5h?):\/\//, '').replace(/^socks:\/\//, '');
     const [authAndHost] = body.split('#'); // отбрасываем hash, если есть
     const [credentials, hostPortPart] = authAndHost.includes('@')
       ? authAndHost.split('@')

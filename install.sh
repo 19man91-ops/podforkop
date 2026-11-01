@@ -2,7 +2,7 @@
 # shellcheck shell=dash
 
 REPO="https://api.github.com/repos/19man91-ops/podforkop/releases/latest"
-ENGINE_REPO="https://api.github.com/repos/podkop-net/podkop-engine/releases/latest"
+ENGINE_REPO="https://api.github.com/repos/19man91-ops/podforkop/releases/tags/podkop-engine-current"
 DOWNLOAD_DIR="/tmp/podkop"
 COUNT=3
 
@@ -236,11 +236,28 @@ get_package_arch() {
 
 install_podkop_engine() {
     local pkg_ext="$1"
-    local engine_package arch asset filename filepath attempt
+    local engine_package installed_engine_package arch asset filename filepath attempt release_data checksum_url checksum_file expected_hash actual_hash
 
-    engine_package="podkop-engine"
+    case "${PODFORCOP_ENGINE_VARIANT:-}" in
+        "")
+            if pkg_is_installed "podkop-engine-full"; then
+                engine_package="podkop-engine-full"
+            else
+                engine_package="podkop-engine"
+            fi
+            ;;
+        slim) engine_package="podkop-engine" ;;
+        full) engine_package="podkop-engine-full" ;;
+        *)
+            msg "PODFORCOP_ENGINE_VARIANT must be 'slim' or 'full'."
+            exit 1
+            ;;
+    esac
+
     if pkg_is_installed "podkop-engine-full"; then
-        engine_package="podkop-engine-full"
+        installed_engine_package="podkop-engine-full"
+    elif pkg_is_installed "podkop-engine"; then
+        installed_engine_package="podkop-engine"
     fi
 
     arch=$(get_package_arch) || {
@@ -249,11 +266,31 @@ install_podkop_engine() {
     }
 
     msg "Finding $engine_package package for $arch..."
-    asset=$(wget -qO- "$ENGINE_REPO" | tr '{' '\n' \
+    release_data="$DOWNLOAD_DIR/podkop-engine-release.json"
+    if ! wget -q -O "$release_data" "$ENGINE_REPO"; then
+        msg "Could not read the podkop-engine package mirror from the PodForCOP repository."
+        exit 1
+    fi
+
+    asset=$(tr '{' '\n' < "$release_data" \
         | sed -n "s|.*\"url\":\"\([^\"]*/releases/assets/[0-9]*\)\".*\"name\":\"\(${engine_package}_[^\"]*_openwrt_${arch}\.${pkg_ext}\)\".*|\1 \2|p" \
         | head -n 1)
     if [ -z "$asset" ]; then
-        msg "Could not find a podkop-engine $pkg_ext package for OpenWrt architecture $arch."
+        msg "The PodForCOP podkop-engine mirror has no $pkg_ext package for OpenWrt architecture $arch."
+        exit 1
+    fi
+
+    checksum_url=$(tr '{' '\n' < "$release_data" \
+        | sed -n 's|.*"url":"\([^"]*/releases/assets/[0-9]*\)".*"name":"SHA256SUMS".*|\1|p' \
+        | head -n 1)
+    if [ -z "$checksum_url" ]; then
+        msg "The podkop-engine mirror has no SHA256SUMS asset."
+        exit 1
+    fi
+    checksum_file="$DOWNLOAD_DIR/podkop-engine-SHA256SUMS"
+    if ! wget -q --header="Accept: application/octet-stream" -O "$checksum_file" "$checksum_url" \
+        || [ ! -s "$checksum_file" ]; then
+        msg "Could not download podkop-engine checksums."
         exit 1
     fi
 
@@ -274,14 +311,37 @@ install_podkop_engine() {
         exit 1
     fi
 
-    if [ "$PKG_IS_APK" -eq 0 ] && ! pkg_is_installed "$engine_package"; then
-        msg "Replacing the OpenWrt sing-box package with podkop-engine..."
-        service podkop stop >/dev/null 2>&1 || true
-        opkg remove --force-depends sing-box sing-box-tiny >/dev/null 2>&1 || true
+    expected_hash=$(awk -v filename="$filename" '{ name=$2; sub(/^\*/, "", name); sub(/^\.\//, "", name); if (name == filename) { print $1; exit } }' "$checksum_file")
+    actual_hash=$(sha256sum "$filepath" | awk '{print $1}')
+    if [ -z "$expected_hash" ] || [ "$actual_hash" != "$expected_hash" ]; then
+        msg "Checksum verification failed for $filename."
+        rm -f "$filepath"
+        exit 1
+    fi
+
+    if [ "$PKG_IS_APK" -eq 0 ]; then
+        if [ -n "$installed_engine_package" ] && [ "$installed_engine_package" != "$engine_package" ]; then
+            msg "Switching from $installed_engine_package to $engine_package..."
+            service podkop stop >/dev/null 2>&1 || true
+            opkg remove --force-depends "$installed_engine_package" || {
+                msg "Could not remove the previous podkop-engine package."
+                exit 1
+            }
+        elif [ -z "$installed_engine_package" ]; then
+            msg "Replacing the OpenWrt sing-box package with $engine_package..."
+            service podkop stop >/dev/null 2>&1 || true
+            opkg remove --force-depends sing-box sing-box-tiny >/dev/null 2>&1 || true
+        fi
     fi
 
     msg "Installing $filename..."
-    if ! pkg_install "$filepath"; then
+    if [ "$PKG_IS_APK" -eq 1 ] && [ -n "$installed_engine_package" ] \
+        && [ "$installed_engine_package" != "$engine_package" ]; then
+        if ! apk add --allow-untrusted "$filepath" "!$installed_engine_package"; then
+            msg "Could not install podkop-engine. Check available flash space and package-manager output."
+            exit 1
+        fi
+    elif ! pkg_install "$filepath"; then
         msg "Could not install podkop-engine. Check available flash space and package-manager output."
         exit 1
     fi

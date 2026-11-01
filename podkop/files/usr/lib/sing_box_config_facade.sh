@@ -62,10 +62,9 @@ sing_box_cf_add_proxy_outbound() {
     local udp_over_tcp="$4"
 
     case "$(url_get_scheme "$url")" in
-    hysteria2 | hy2)
-        # The engine's link decoder preserves Hysteria2-specific parameters such as
-        # multi-port ranges and correctly handles escaped credentials. Keep the
-        # local parser as a fallback for stock sing-box builds without the decoder.
+    vless | vmess | trojan | ss | socks | socks4 | socks4a | socks5 | socks5h | hysteria2 | hy2 | hysteria | tuic | http | https | anytls | naive+https | naive+quic)
+        # Use the engine's URI decoder so subscriptions retain protocol-specific
+        # options and escaped values; keep local parsing for stock sing-box builds.
         if sing_box_has_feature "tools.decode-link"; then
             _add_decoded_proxy_outbound "$config" "$section" "$url"
             return
@@ -218,13 +217,13 @@ _add_decoded_proxy_outbound() {
     local tag outbound status messages message
     tag=$(get_outbound_tag_by_section "$section")
     messages="/tmp/podkop-decode-link.$$"
-    outbound=$(sing-box tools decode-link --compact "$url" 2> "$messages")
+    outbound=$(printf '%s\n' "$url" | sing-box tools decode-link --compact 2> "$messages")
     status=$?
 
     if [ "$status" -ne 0 ]; then
-        log "Cannot use the proxy link of $section: $(head -n 1 "$messages"). Aborted." "fatal"
+        log "Cannot use a proxy link in $section: $(head -n 1 "$messages"). Skipping this link." "warn"
         rm -f "$messages"
-        exit 1
+        return 1
     fi
 
     while read -r message; do

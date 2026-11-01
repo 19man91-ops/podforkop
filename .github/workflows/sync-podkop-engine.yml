@@ -1,0 +1,120 @@
+name: Sync podkop-engine packages
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-podkop-engine
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Mirror latest podkop-engine release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5.0.0
+
+      - name: Download, verify, and publish engine packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          repository="$GITHUB_REPOSITORY"
+          mirror_tag="podkop-engine-current"
+          mirror_dir="$RUNNER_TEMP/podkop-engine-mirror"
+          release_json="$RUNNER_TEMP/podkop-engine-upstream-release.json"
+
+          mkdir -p "$mirror_dir"
+          curl --fail --silent --show-error --location --retry 3 \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/podkop-net/podkop-engine/releases/latest" \
+            -o "$release_json"
+
+          source_tag=$(jq -r '.tag_name' "$release_json")
+          if [ -z "$source_tag" ] || [ "$source_tag" = "null" ]; then
+            echo "The upstream podkop-engine release has no tag name." >&2
+            exit 1
+          fi
+          case "$source_tag" in
+            *[!A-Za-z0-9._-]*|"") echo "The upstream release tag contains unexpected characters." >&2; exit 1 ;;
+          esac
+
+          package_count=$(jq '[.assets[] | select((.name | startswith("podkop-engine_") or startswith("podkop-engine-full_")) and (.name | endswith(".ipk") or endswith(".apk")))] | length' "$release_json")
+          checksum_count=$(jq '[.assets[] | select(.name == "SHA256SUMS")] | length' "$release_json")
+          if [ "$package_count" -lt 20 ] || [ "$checksum_count" -ne 1 ]; then
+            echo "The upstream release is missing engine packages or SHA256SUMS." >&2
+            exit 1
+          fi
+
+          current_body=$(gh release view "$mirror_tag" --repo "$repository" --json body --jq '.body' 2>/dev/null || true)
+          current_asset_count=$(gh api "repos/$repository/releases/tags/$mirror_tag" --jq '.assets | length' 2>/dev/null || echo 0)
+          expected_asset_count=$((package_count + checksum_count + 2))
+          if printf '%s\n' "$current_body" | grep -Fqx "Upstream tag: $source_tag" \
+            && [ "$current_asset_count" -eq "$expected_asset_count" ]; then
+            echo "The PodForCOP mirror already contains $source_tag."
+            exit 0
+          fi
+
+          jq -r '.assets[] | select(.name == "SHA256SUMS" or ((.name | startswith("podkop-engine_") or startswith("podkop-engine-full_")) and (.name | endswith(".ipk") or endswith(".apk")))) | [.name, .browser_download_url] | @tsv' "$release_json" \
+            | while IFS="$(printf '\t')" read -r asset_name asset_url; do
+                case "$asset_name" in
+                  SHA256SUMS|podkop-engine_*.ipk|podkop-engine_*.apk|podkop-engine-full_*.ipk|podkop-engine-full_*.apk) ;;
+                  *) echo "Unexpected asset name: $asset_name" >&2; exit 1 ;;
+                esac
+                curl --fail --silent --show-error --location --retry 3 \
+                  "$asset_url" -o "$mirror_dir/$asset_name"
+              done
+
+          (
+            cd "$mirror_dir"
+            sha256sum --check SHA256SUMS
+          )
+
+          source_archive="podkop-engine-$source_tag-source.tar.gz"
+          curl --fail --silent --show-error --location --retry 3 \
+            "https://codeload.github.com/podkop-net/podkop-engine/tar.gz/refs/tags/$source_tag" \
+            -o "$mirror_dir/$source_archive"
+
+          cat > "$mirror_dir/ENGINE_SOURCE.txt" <<EOF
+          Upstream repository: https://github.com/podkop-net/podkop-engine
+          Upstream tag: $source_tag
+          License: GPL-3.0-or-later
+          Corresponding source: https://github.com/podkop-net/podkop-engine/tree/$source_tag
+          Source archive: $source_archive
+          EOF
+
+          cat > "$RUNNER_TEMP/engine-release-notes.md" <<EOF
+          Architecture-specific podkop-engine packages mirrored for PodForCOP's installer.
+
+          Upstream tag: $source_tag
+          Source and license (GPL-3.0-or-later): https://github.com/podkop-net/podkop-engine/tree/$source_tag
+
+          The package checksums are in SHA256SUMS and were verified before upload. The corresponding source archive and license information are attached.
+          EOF
+
+          if gh release view "$mirror_tag" --repo "$repository" >/dev/null 2>&1; then
+            release_id=$(gh api "repos/$repository/releases/tags/$mirror_tag" --jq '.id')
+            gh api "repos/$repository/releases/$release_id/assets" --paginate --jq '.[].id' \
+              | while read -r asset_id; do
+                  gh api --method DELETE "repos/$repository/releases/assets/$asset_id" >/dev/null
+                done
+            gh release edit "$mirror_tag" --repo "$repository" \
+              --title "podkop-engine packages for PodForCOP" \
+              --notes-file "$RUNNER_TEMP/engine-release-notes.md" \
+              --prerelease
+          else
+            gh release create "$mirror_tag" --repo "$repository" --target main \
+              --title "podkop-engine packages for PodForCOP" \
+              --notes-file "$RUNNER_TEMP/engine-release-notes.md" \
+              --prerelease
+          fi
+
+          gh release upload "$mirror_tag" "$mirror_dir"/* --repo "$repository" --clobber

@@ -674,7 +674,10 @@ configure_outbound_handler() {
                 log "Proxy string is not set. Aborted." "fatal"
                 exit 1
             fi
-            config=$(sing_box_cf_add_proxy_outbound "$config" "$section" "$proxy_string" "$udp_over_tcp")
+            config=$(sing_box_cf_add_proxy_outbound "$config" "$section" "$proxy_string" "$udp_over_tcp") || {
+                log "Could not decode the proxy URL for section $section. Aborted." "fatal"
+                exit 1
+            }
             ;;
         outbound)
             log "Detected proxy configuration type: outbound" "debug"
@@ -684,7 +687,7 @@ configure_outbound_handler() {
             ;;
         selector)
             log "Detected proxy configuration type: selector" "debug"
-            local selector_proxy_links selector_subscription_urls subscription_links udp_over_tcp i outbound_tags outbound_tag default_outbound old_noglob
+            local selector_proxy_links selector_subscription_urls subscription_links udp_over_tcp i outbound_tags outbound_tag default_outbound old_noglob next_config
             config_get selector_proxy_links "$section" "selector_proxy_links"
             config_get selector_subscription_urls "$section" "selector_subscription_urls"
             config_get udp_over_tcp "$section" "enable_udp_over_tcp"
@@ -703,17 +706,26 @@ configure_outbound_handler() {
             set -f
             i=1
             for link in $selector_proxy_links; do
-                config="$(sing_box_cf_add_proxy_outbound "$config" "$section-$i" "$link" "$udp_over_tcp")"
-                outbound_tag="$(get_outbound_tag_by_section "$section-$i")"
-                if [ -z "$outbound_tags" ]; then
-                    outbound_tags="$outbound_tag"
-                    default_outbound="$outbound_tag"
+                if next_config="$(sing_box_cf_add_proxy_outbound "$config" "$section-$i" "$link" "$udp_over_tcp")"; then
+                    config="$next_config"
+                    outbound_tag="$(get_outbound_tag_by_section "$section-$i")"
+                    if [ -z "$outbound_tags" ]; then
+                        outbound_tags="$outbound_tag"
+                        default_outbound="$outbound_tag"
+                    else
+                        outbound_tags="$outbound_tags,$outbound_tag"
+                    fi
                 else
-                    outbound_tags="$outbound_tags,$outbound_tag"
+                    log "Skipping an unsupported or invalid proxy link in section $section." "warn"
                 fi
                 i=$((i + 1))
             done
             [ "$old_noglob" = "1" ] || set +f
+
+            if [ -z "$outbound_tags" ]; then
+                log "Section $section has no proxy links supported by the installed sing-box. Aborted." "fatal"
+                exit 1
+            fi
 
             selector_tag="$(get_outbound_tag_by_section "$section")"
             selector_outbounds="$(comma_string_to_json_array "$outbound_tags")"
@@ -722,7 +734,7 @@ configure_outbound_handler() {
             ;;
         urltest)
             log "Detected proxy configuration type: urltest" "debug"
-            local urltest_proxy_links urltest_subscription_urls subscription_links udp_over_tcp i urltest_tag selector_tag outbound_tag outbound_tags old_noglob \
+            local urltest_proxy_links urltest_subscription_urls subscription_links udp_over_tcp i urltest_tag selector_tag outbound_tag outbound_tags old_noglob next_config \
                 urltest_outbounds selector_outbounds urltest_check_interval urltest_tolerance urltest_testing_url \
                 urltest_fallback_links fallback_tags urltest_fallbacks urltest_download_check urltest_download_url
             config_get urltest_proxy_links "$section" "urltest_proxy_links"
@@ -759,28 +771,41 @@ configure_outbound_handler() {
             set -f
             i=1
             for link in $urltest_proxy_links; do
-                config="$(sing_box_cf_add_proxy_outbound "$config" "$section-$i" "$link" "$udp_over_tcp")"
-                outbound_tag="$(get_outbound_tag_by_section "$section-$i")"
-                if [ -z "$outbound_tags" ]; then
-                    outbound_tags="$outbound_tag"
+                if next_config="$(sing_box_cf_add_proxy_outbound "$config" "$section-$i" "$link" "$udp_over_tcp")"; then
+                    config="$next_config"
+                    outbound_tag="$(get_outbound_tag_by_section "$section-$i")"
+                    if [ -z "$outbound_tags" ]; then
+                        outbound_tags="$outbound_tag"
+                    else
+                        outbound_tags="$outbound_tags,$outbound_tag"
+                    fi
                 else
-                    outbound_tags="$outbound_tags,$outbound_tag"
+                    log "Skipping an unsupported or invalid proxy link in section $section." "warn"
                 fi
                 i=$((i + 1))
             done
 
             i=1
             for link in $urltest_fallback_links; do
-                config="$(sing_box_cf_add_proxy_outbound "$config" "$section-fallback-$i" "$link" "$udp_over_tcp")"
-                outbound_tag="$(get_outbound_tag_by_section "$section-fallback-$i")"
-                if [ -z "$fallback_tags" ]; then
-                    fallback_tags="$outbound_tag"
+                if next_config="$(sing_box_cf_add_proxy_outbound "$config" "$section-fallback-$i" "$link" "$udp_over_tcp")"; then
+                    config="$next_config"
+                    outbound_tag="$(get_outbound_tag_by_section "$section-fallback-$i")"
+                    if [ -z "$fallback_tags" ]; then
+                        fallback_tags="$outbound_tag"
+                    else
+                        fallback_tags="$fallback_tags,$outbound_tag"
+                    fi
                 else
-                    fallback_tags="$fallback_tags,$outbound_tag"
+                    log "Skipping an unsupported or invalid fallback link in section $section." "warn"
                 fi
                 i=$((i + 1))
             done
             [ "$old_noglob" = "1" ] || set +f
+
+            if [ -z "$outbound_tags" ]; then
+                log "Section $section has no proxy links supported by the installed sing-box. Aborted." "fatal"
+                exit 1
+            fi
 
             urltest_tag="$(get_outbound_tag_by_section "$section-urltest")"
             selector_tag="$(get_outbound_tag_by_section "$section")"

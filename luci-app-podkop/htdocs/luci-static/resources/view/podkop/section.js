@@ -49,7 +49,7 @@ function createSectionContent(section, singBoxFeatures = []) {
     form.TextValue,
     "proxy_string",
     _("Proxy Configuration URL"),
-    _("vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links")
+    _("Links supported by podkop-engine; VMess, Hysteria, AnyTLS and NaiveProxy require podkop-engine-full")
   );
   o.depends("proxy_config_type", "url");
   o.rows = 5;
@@ -101,7 +101,7 @@ function createSectionContent(section, singBoxFeatures = []) {
     form.DynamicList,
     "selector_proxy_links",
     _("Selector Proxy Links"),
-    _("vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links; can be used alone or with subscription URLs")
+    _("Links supported by podkop-engine; VMess, Hysteria, AnyTLS and NaiveProxy require podkop-engine-full. Direct links and subscriptions can be combined.")
   );
   o.depends("proxy_config_type", "selector");
   o.rmempty = true;
@@ -136,7 +136,7 @@ function createSectionContent(section, singBoxFeatures = []) {
     form.DynamicList,
     "urltest_proxy_links",
     _("URLTest Proxy Links"),
-    _("vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links; can be used alone or with subscription URLs")
+    _("Links supported by podkop-engine; VMess, Hysteria, AnyTLS and NaiveProxy require podkop-engine-full. Direct links and subscriptions can be combined.")
   );
   o.depends("proxy_config_type", "urltest");
   o.rmempty = true;
@@ -798,6 +798,11 @@ function createSectionContent(section, singBoxFeatures = []) {
   o.rmempty = false;
   o.depends("connection_type", "proxy");
   o.depends("connection_type", "vpn");
+
+  // Keep the sections page scannable; the complete form opens from the row's Edit action.
+  for (const option of section.children) {
+    option.modalonly = true;
+  }
 }
 
 const EntryPoint = {

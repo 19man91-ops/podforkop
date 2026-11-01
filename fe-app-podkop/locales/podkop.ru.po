@@ -1,15 +1,15 @@
 # RU translations for PODKOP package.
 # Copyright (C) 2026 THE PODKOP'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PODKOP package.
-# divocatt, 2026.
+# Codex, 2026.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: PODKOP\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-29 16:40+0300\n"
-"PO-Revision-Date: 2026-05-29 16:40+0300\n"
-"Last-Translator: divocatt\n"
+"POT-Creation-Date: 2026-11-01 17:42+0300\n"
+"PO-Revision-Date: 2026-11-01 17:42+0300\n"
+"Last-Translator: Codex\n"
 "Language-Team: none\n"
 "Language: ru\n"
 "MIME-Version: 1.0\n"
@@ -31,6 +31,9 @@ msgstr "✘ Остановлен"
 
 msgid "Active Connections"
 msgstr "Активные соединения"
+
+msgid "Add section"
+msgstr "Добавить секцию"
 
 msgid "Additional marking rules found"
 msgstr "Найдены дополнительные правила маркировки"
@@ -65,6 +68,9 @@ msgstr "Браузер не использует FakeIP"
 msgid "Browser is using FakeIP correctly"
 msgstr "Браузер использует FakeIP"
 
+msgid "Bypass sections for BitTorrent traffic"
+msgstr "Обход секций для BitTorrent-трафика"
+
 msgid "Cache File Path"
 msgstr "Путь к файлу кэша"
 
@@ -97,9 +103,6 @@ msgstr "Списки сообщества"
 
 msgid "Config File Path"
 msgstr "Путь к файлу конфигурации"
-
-msgid "Configuration for Podkop service"
-msgstr "Настройки сервиса Podkop"
 
 msgid "Configuration Type"
 msgstr "Тип конфигурации"
@@ -287,6 +290,9 @@ msgstr "Глобальная проверка"
 msgid "HTTP error"
 msgstr "Ошибка HTTP"
 
+msgid "HTTP(S) subscription links returning proxy URLs; can be used alone or together with proxy links and are refreshed using the global list update frequency"
+msgstr "HTTP(S)-ссылки на подписки, возвращающие ссылки на прокси; можно использовать отдельно или вместе со ссылками прокси. Обновляются с общей периодичностью обновления списков."
+
 msgid "Interface Monitoring"
 msgstr "Мониторинг интерфейса"
 
@@ -404,9 +410,6 @@ msgstr "Неверный URL SOCKS: отсутствует имя пользов
 msgid "Invalid SOCKS URL: must not contain spaces"
 msgstr "Неверный URL SOCKS: не должен содержать пробелов"
 
-msgid "Invalid SOCKS URL: must start with socks4://, socks4a://, or socks5://"
-msgstr "Неверный URL-адрес SOCKS: должен начинаться с socks4://, socks4a:// или socks5://"
-
 msgid "Invalid SOCKS URL: parsing failed"
 msgstr "Неверный URL SOCKS: парсинг не удался"
 
@@ -434,8 +437,14 @@ msgstr "Обнаружены проблемы"
 msgid "Latest"
 msgstr "Последняя"
 
-msgid "List Update Frequency"
-msgstr "Частота обновления списков"
+msgid "Links supported by podkop-engine; VMess, Hysteria, AnyTLS and NaiveProxy require podkop-engine-full"
+msgstr "Ссылки, поддерживаемые podkop-engine; для VMess, Hysteria, AnyTLS и NaiveProxy нужен podkop-engine-full"
+
+msgid "Links supported by podkop-engine; VMess, Hysteria, AnyTLS and NaiveProxy require podkop-engine-full. Direct links and subscriptions can be combined."
+msgstr "Ссылки, поддерживаемые podkop-engine; для VMess, Hysteria, AnyTLS и NaiveProxy нужен podkop-engine-full. Прямые ссылки и подписки можно объединять."
+
+msgid "List and Subscription Update Frequency"
+msgstr "Частота обновления списков и подписок"
 
 msgid "Local Domain Lists"
 msgstr "Локальные списки доменов"
@@ -448,6 +457,9 @@ msgstr "Уровень логов"
 
 msgid "Main DNS"
 msgstr "Основной DNS"
+
+msgid "Manage traffic sections, proxy subscriptions, and router settings"
+msgstr "Управление секциями трафика, подписками прокси и настройками роутера"
 
 msgid "Memory Usage"
 msgstr "Использование памяти"
@@ -506,11 +518,11 @@ msgstr "Путь должен заканчиваться на cache.db"
 msgid "Pending"
 msgstr "Ожидает запуска"
 
+msgid "PodForCOP Settings"
+msgstr "Настройки PodForCOP"
+
 msgid "Podkop"
 msgstr "Podkop"
-
-msgid "Podkop Settings"
-msgstr "Настройки podkop"
 
 msgid "Podkop will not modify your DHCP configuration"
 msgstr "Podkop не будет изменять вашу конфигурацию DHCP."
@@ -538,6 +550,9 @@ msgstr "Разрешение реальных IP-адресов"
 
 msgid "Restart podkop"
 msgstr "Перезапустить Podkop"
+
+msgid "Route detected BitTorrent peer and DHT traffic directly before section rules. HTTP(S) tracker requests are not detected as BitTorrent traffic."
+msgstr "Распознанные соединения BitTorrent между узлами и DHT направляются напрямую до применения правил секций. HTTP(S)-запросы к трекерам не распознаются как BitTorrent-трафик."
 
 msgid "Router DNS is not routed through sing-box"
 msgstr "DNS роутера не проходит через sing-box"
@@ -581,14 +596,17 @@ msgstr "Секции"
 msgid "Select a predefined list for routing"
 msgstr "Выберите предопределенный список для маршрутизации"
 
+msgid "Select a section to edit its connection and traffic rules."
+msgstr "Выберите секцию, чтобы настроить подключение и правила маршрутизации."
+
 msgid "Select between VPN and Proxy connection methods for traffic routing"
 msgstr "Выберите между VPN и Proxy методами для маршрутизации трафика"
 
 msgid "Select DNS protocol to use"
 msgstr "Выберите протокол DNS"
 
-msgid "Select how often the domain or subnet lists are updated automatically"
-msgstr "Выберите частоту автоматического обновления списков доменов или подсетей."
+msgid "Select how often domain, subnet, and proxy subscription data are updated automatically"
+msgstr "Выберите частоту автоматического обновления доменных списков, подсетей и подписок прокси."
 
 msgid "Select how to configure the proxy"
 msgstr "Выберите способ настройки прокси"
@@ -631,6 +649,9 @@ msgstr "Selector"
 
 msgid "Selector Proxy Links"
 msgstr "Ссылки прокси для Selector"
+
+msgid "Selector Subscription URLs"
+msgstr "Ссылки на подписки для Selector"
 
 msgid "Services info"
 msgstr "Информация о сервисах"
@@ -688,6 +709,9 @@ msgstr "Остановить podkop"
 
 msgid "Successfully copied!"
 msgstr "Успешно скопировано!"
+
+msgid "Supported links: VLESS, VMess, Trojan, Shadowsocks, SOCKS, Hysteria, TUIC, HTTP(S), AnyTLS, and NaiveProxy"
+msgstr "Поддерживаются ссылки VLESS, VMess, Trojan, Shadowsocks, SOCKS, Hysteria, TUIC, HTTP(S), AnyTLS и NaiveProxy"
 
 msgid "System info"
 msgstr "Системная информация"
@@ -752,9 +776,6 @@ msgstr "Неизвестная ошибка"
 msgid "Uplink"
 msgstr "Исходящий"
 
-msgid "URL must start with vless://, ss://, trojan://, socks4/5://, or hysteria2://hy2://"
-msgstr "URL должен начинаться с vless://, ss://, trojan://, socks4/5:// или hysteria2:// hy2://"
-
 msgid "URL must use one of the following protocols:"
 msgstr "URL должен использовать один из следующих протоколов:"
 
@@ -766,6 +787,9 @@ msgstr "Интервал проверки URLTest"
 
 msgid "URLTest Proxy Links"
 msgstr "Ссылки прокси для URLTest"
+
+msgid "URLTest Subscription URLs"
+msgstr "Ссылки на подписки для URLTest"
 
 msgid "URLTest Testing URL"
 msgstr "URLTest ссылка для проверки"
@@ -805,9 +829,6 @@ msgstr "Посмотреть логи"
 
 msgid "Visit Wiki"
 msgstr "Перейти в wiki"
-
-msgid "vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links"
-msgstr ""
 
 msgid "Warning: %s cannot be used together with %s. Previous selections have been removed."
 msgstr "Предупреждение: %s нельзя использовать вместе с %s. Предыдущие варианты были удалены."

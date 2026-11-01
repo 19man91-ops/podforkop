@@ -26,21 +26,25 @@ const EntryPoint = {
 
     const podkopMap = new form.Map(
       "podkop",
-      _("Podkop Settings"),
-      _("Configuration for Podkop service"),
+      _("PodForCOP Settings"),
+      _("Manage traffic sections, proxy subscriptions, and router settings"),
     );
     // Enable tab views
     podkopMap.tabbed = true;
 
     // Sections tab
     const sectionsSection = podkopMap.section(
-      form.TypedSection,
+      form.GridSection,
       "section",
       _("Sections"),
     );
     sectionsSection.anonymous = false;
     sectionsSection.addremove = true;
-    sectionsSection.template = "cbi/simpleform";
+    sectionsSection.addbtntitle = _("Add section");
+    sectionsSection.nodescriptions = true;
+    sectionsSection.description = _(
+      "Select a section to edit its connection and traffic rules.",
+    );
 
     // Render section content
     section.createSectionContent(sectionsSection, singBoxFeatures);

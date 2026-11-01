@@ -19,7 +19,7 @@ _subscription_extract_links() {
     local decoded_file="$input_file.decoded"
     local encoded remainder
 
-    if ! grep -Eiq '^[[:space:]]*(vless|trojan|ss|socks4a?|socks5|hysteria2|hy2)://' "$input_file"; then
+    if ! grep -Eiq '^[[:space:]]*(vless|vmess|trojan|ss|socks|socks4a?|socks5h?|hysteria2|hy2|hysteria|tuic|http|https|anytls|naive\+(https|quic))://' "$input_file"; then
         encoded="$(tr -d '[:space:]' < "$input_file" | tr '_-' '/+')"
         remainder=$((${#encoded} % 4))
         case "$remainder" in
@@ -43,7 +43,7 @@ _subscription_extract_links() {
             sub(/\r$/, "")
             sub(/^[[:space:]]+/, "")
             sub(/[[:space:]]+$/, "")
-            if (tolower($0) ~ /^(vless|trojan|ss|socks4a?|socks5|hysteria2|hy2):\/\//) {
+            if (tolower($0) ~ /^(vless|vmess|trojan|ss|socks|socks4a?|socks5h?|hysteria2|hy2|hysteria|tuic|http|https|anytls|naive\+(https|quic)):\/\//) {
                 separator = index($0, "://")
                 print tolower(substr($0, 1, separator - 1)) substr($0, separator)
             }
