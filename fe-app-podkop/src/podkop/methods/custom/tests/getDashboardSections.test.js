@@ -108,7 +108,9 @@ describe('getDashboardSections, urltest section', () => {
             all: ['FI-ruspace', 'FI-ruspace-Yulya-FI'],
           }),
           'FI-ruspace': proxy('FI-ruspace', { type: 'VLESS' }),
-          'FI-ruspace-Yulya-FI': proxy('FI-ruspace-Yulya-FI', { type: 'Hysteria2' }),
+          'FI-ruspace-Yulya-FI': proxy('FI-ruspace-Yulya-FI', {
+            type: 'Hysteria2',
+          }),
         },
       },
     });

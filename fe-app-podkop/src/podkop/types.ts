@@ -85,10 +85,21 @@ export namespace Podkop {
     upload?: number;
     chains?: string[];
     rule?: string;
-    metadata?: { host?: string; destinationIP?: string; destinationPort?: string|number; sourceIP?: string; network?: string; type?: string };
+    metadata?: {
+      host?: string;
+      destinationIP?: string;
+      destinationPort?: string | number;
+      sourceIP?: string;
+      network?: string;
+      type?: string;
+    };
   }
 
-  export interface ClashConnections { connections?: ClashConnection[]; downloadTotal?: number; uploadTotal?: number; }
+  export interface ClashConnections {
+    connections?: ClashConnection[];
+    downloadTotal?: number;
+    uploadTotal?: number;
+  }
 
   export interface Outbound {
     code: string;

@@ -150,7 +150,9 @@ function renderSource(item: ConnectionListItem) {
     E('span', { class: 'fkp_monitoring-page__muted' }, item.sourceDetail);
 
   return renderValue(
-    [item.sourceName, detail ? ' ' : '', detail].filter(Boolean) as unknown as string,
+    [item.sourceName, detail ? ' ' : '', detail].filter(
+      Boolean,
+    ) as unknown as string,
     'fkp_monitoring-page__value',
     label,
   );
@@ -251,9 +253,10 @@ export function renderConnectionListState(
           E(
             'div',
             {
-              class: [cellClass('state'), 'fkp_monitoring-page__cell--span'].join(
-                ' ',
-              ),
+              class: [
+                cellClass('state'),
+                'fkp_monitoring-page__cell--span',
+              ].join(' '),
               role: 'cell',
             },
             [

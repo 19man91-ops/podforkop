@@ -1,8 +1,29 @@
 import { validateIP } from '../validators';
 
-let callHostHints: any;
-let callDHCPLeases: any;
-let callNetworkInterfaceDump: any;
+type RpcCallFn = () => Promise<unknown>;
+
+let callHostHints: RpcCallFn | undefined;
+let callDHCPLeases: RpcCallFn | undefined;
+let callNetworkInterfaceDump: RpcCallFn | undefined;
+
+interface HostHintRecord {
+  name?: string;
+  ipaddrs?: string[];
+}
+
+interface DHCPLeasesPayload {
+  dhcp_leases?: DHCPLeaseRecord[];
+}
+
+interface DHCPLeaseRecord {
+  hostname?: string;
+  ipaddr?: string;
+}
+
+interface StaticHostRecord {
+  name?: string;
+  ip?: string;
+}
 
 try {
   if (typeof rpc !== 'undefined' && typeof rpc.declare === 'function') {
@@ -75,32 +96,36 @@ export function loadLocalDevices(): Promise<LocalDevices> {
       const names: Record<string, string> = {};
 
       if (hostHints && typeof hostHints === 'object') {
-        Object.values(hostHints).forEach((hint: any) => {
-          if (!hint || typeof hint !== 'object') return;
-          const name = normalizeName(hint.name);
-          if (!name) return;
-          const ipaddrs = Array.isArray(hint.ipaddrs) ? hint.ipaddrs : [];
-          ipaddrs.forEach((ip: string) => {
-            if (ip && validateIP(ip).valid) names[ip] = name;
-          });
-        });
+        Object.values(hostHints as Record<string, HostHintRecord>).forEach(
+          (hint) => {
+            if (!hint || typeof hint !== 'object') return;
+            const name = normalizeName(hint.name);
+            if (!name) return;
+            const ipaddrs = Array.isArray(hint.ipaddrs) ? hint.ipaddrs : [];
+            ipaddrs.forEach((ip: string) => {
+              if (ip && validateIP(ip).valid) names[ip] = name;
+            });
+          },
+        );
       }
 
       if (
         dhcpLeases &&
         typeof dhcpLeases === 'object' &&
-        Array.isArray((dhcpLeases as any).dhcp_leases)
+        Array.isArray((dhcpLeases as DHCPLeasesPayload).dhcp_leases)
       ) {
-        (dhcpLeases as any).dhcp_leases.forEach((lease: any) => {
-          if (!lease || typeof lease !== 'object') return;
-          const name = normalizeName(lease.hostname);
-          const ip = `${lease.ipaddr || ''}`.trim();
-          if (ip && name && validateIP(ip).valid) names[ip] = name;
-        });
+        ((dhcpLeases as DHCPLeasesPayload).dhcp_leases || []).forEach(
+          (lease) => {
+            if (!lease || typeof lease !== 'object') return;
+            const name = normalizeName(lease.hostname);
+            const ip = `${lease.ipaddr || ''}`.trim();
+            if (ip && name && validateIP(ip).valid) names[ip] = name;
+          },
+        );
       }
 
       if (Array.isArray(staticHosts)) {
-        staticHosts.forEach((host: any) => {
+        (staticHosts as StaticHostRecord[]).forEach((host) => {
           if (!host || typeof host !== 'object') return;
           const name = normalizeName(host.name);
           const ip = `${host.ip || ''}`.trim();

@@ -45,11 +45,18 @@ export const PodkopShellMethods = {
       proxy,
     ]),
   getClashApiConnections: async () =>
-    callBaseMethod<Podkop.ClashConnections>(Podkop.AvailableMethods.CLASH_API, [Podkop.AvailableClashAPIMethods.GET_CONNECTIONS]),
+    callBaseMethod<Podkop.ClashConnections>(Podkop.AvailableMethods.CLASH_API, [
+      Podkop.AvailableClashAPIMethods.GET_CONNECTIONS,
+    ]),
   closeClashApiConnection: async (id: string) =>
-    callBaseMethod<unknown>(Podkop.AvailableMethods.CLASH_API, [Podkop.AvailableClashAPIMethods.CLOSE_CONNECTION, id]),
+    callBaseMethod<unknown>(Podkop.AvailableMethods.CLASH_API, [
+      Podkop.AvailableClashAPIMethods.CLOSE_CONNECTION,
+      id,
+    ]),
   closeClashApiConnections: async () =>
-    callBaseMethod<unknown>(Podkop.AvailableMethods.CLASH_API, [Podkop.AvailableClashAPIMethods.CLOSE_CONNECTIONS]),
+    callBaseMethod<unknown>(Podkop.AvailableMethods.CLASH_API, [
+      Podkop.AvailableClashAPIMethods.CLOSE_CONNECTIONS,
+    ]),
   restart: async () =>
     callBaseMethod<unknown>(
       Podkop.AvailableMethods.RESTART,

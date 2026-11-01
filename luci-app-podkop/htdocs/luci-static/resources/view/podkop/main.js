@@ -741,9 +741,16 @@ var PodkopShellMethods = {
     group,
     proxy
   ]),
-  getClashApiConnections: async () => callBaseMethod(Podkop.AvailableMethods.CLASH_API, [Podkop.AvailableClashAPIMethods.GET_CONNECTIONS]),
-  closeClashApiConnection: async (id) => callBaseMethod(Podkop.AvailableMethods.CLASH_API, [Podkop.AvailableClashAPIMethods.CLOSE_CONNECTION, id]),
-  closeClashApiConnections: async () => callBaseMethod(Podkop.AvailableMethods.CLASH_API, [Podkop.AvailableClashAPIMethods.CLOSE_CONNECTIONS]),
+  getClashApiConnections: async () => callBaseMethod(Podkop.AvailableMethods.CLASH_API, [
+    Podkop.AvailableClashAPIMethods.GET_CONNECTIONS
+  ]),
+  closeClashApiConnection: async (id) => callBaseMethod(Podkop.AvailableMethods.CLASH_API, [
+    Podkop.AvailableClashAPIMethods.CLOSE_CONNECTION,
+    id
+  ]),
+  closeClashApiConnections: async () => callBaseMethod(Podkop.AvailableMethods.CLASH_API, [
+    Podkop.AvailableClashAPIMethods.CLOSE_CONNECTIONS
+  ]),
   restart: async () => callBaseMethod(
     Podkop.AvailableMethods.RESTART,
     [],
@@ -851,7 +858,7 @@ async function getDashboardSections() {
         } catch {
           parsedOutbound = null;
         }
-        const parsedTag = parsedOutbound?.tag ? decodeURIComponent(parsedOutbound?.tag) : void 0;
+        const parsedTag = typeof parsedOutbound?.tag === "string" ? decodeURIComponent(parsedOutbound.tag) : void 0;
         const proxyDisplayName = parsedTag || outbound?.value?.name || "";
         return {
           withTagSelect: false,
@@ -5268,23 +5275,27 @@ function loadLocalDevices() {
   ]).then(([hostHints, dhcpLeases, _networkInterfaces, staticHosts]) => {
     const names = {};
     if (hostHints && typeof hostHints === "object") {
-      Object.values(hostHints).forEach((hint) => {
-        if (!hint || typeof hint !== "object") return;
-        const name = normalizeName(hint.name);
-        if (!name) return;
-        const ipaddrs = Array.isArray(hint.ipaddrs) ? hint.ipaddrs : [];
-        ipaddrs.forEach((ip) => {
-          if (ip && validateIP(ip).valid) names[ip] = name;
-        });
-      });
+      Object.values(hostHints).forEach(
+        (hint) => {
+          if (!hint || typeof hint !== "object") return;
+          const name = normalizeName(hint.name);
+          if (!name) return;
+          const ipaddrs = Array.isArray(hint.ipaddrs) ? hint.ipaddrs : [];
+          ipaddrs.forEach((ip) => {
+            if (ip && validateIP(ip).valid) names[ip] = name;
+          });
+        }
+      );
     }
     if (dhcpLeases && typeof dhcpLeases === "object" && Array.isArray(dhcpLeases.dhcp_leases)) {
-      dhcpLeases.dhcp_leases.forEach((lease) => {
-        if (!lease || typeof lease !== "object") return;
-        const name = normalizeName(lease.hostname);
-        const ip = `${lease.ipaddr || ""}`.trim();
-        if (ip && name && validateIP(ip).valid) names[ip] = name;
-      });
+      (dhcpLeases.dhcp_leases || []).forEach(
+        (lease) => {
+          if (!lease || typeof lease !== "object") return;
+          const name = normalizeName(lease.hostname);
+          const ip = `${lease.ipaddr || ""}`.trim();
+          if (ip && name && validateIP(ip).valid) names[ip] = name;
+        }
+      );
     }
     if (Array.isArray(staticHosts)) {
       staticHosts.forEach((host) => {
@@ -5463,7 +5474,9 @@ function renderSource(item) {
   }
   const detail = item.sourceDetail && textE("span", { class: "fkp_monitoring-page__muted" }, item.sourceDetail);
   return renderValue(
-    [item.sourceName, detail ? " " : "", detail].filter(Boolean),
+    [item.sourceName, detail ? " " : "", detail].filter(
+      Boolean
+    ),
     "fkp_monitoring-page__value",
     label
   );
@@ -5547,9 +5560,10 @@ function renderConnectionListState(message, options) {
           textE(
             "div",
             {
-              class: [cellClass("state"), "fkp_monitoring-page__cell--span"].join(
-                " "
-              ),
+              class: [
+                cellClass("state"),
+                "fkp_monitoring-page__cell--span"
+              ].join(" "),
               role: "cell"
             },
             [

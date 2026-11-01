@@ -22,7 +22,10 @@ export function validateProxyUrl(url: string): ValidationResult {
     return validateTrojanUrl(trimmedUrl);
   }
 
-  if (/^socks(?:4|4a|5h?):\/\//.test(trimmedUrl) || /^socks:\/\//.test(trimmedUrl)) {
+  if (
+    /^socks(?:4|4a|5h?):\/\//.test(trimmedUrl) ||
+    /^socks:\/\//.test(trimmedUrl)
+  ) {
     return validateSocksUrl(trimmedUrl);
   }
 

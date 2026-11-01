@@ -19,7 +19,9 @@ export function validateSocksUrl(url: string): ValidationResult {
       };
     }
 
-    const body = url.replace(/^socks(?:4|4a|5h?):\/\//, '').replace(/^socks:\/\//, '');
+    const body = url
+      .replace(/^socks(?:4|4a|5h?):\/\//, '')
+      .replace(/^socks:\/\//, '');
     const [authAndHost] = body.split('#'); // отбрасываем hash, если есть
     const [credentials, hostPortPart] = authAndHost.includes('@')
       ? authAndHost.split('@')

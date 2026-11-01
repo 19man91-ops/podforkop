@@ -1,4 +1,7 @@
-export function parseHostPort(hostPortPart: string): { host: string; port: string } {
+export function parseHostPort(hostPortPart: string): {
+  host: string;
+  port: string;
+} {
   const trimmed = hostPortPart.trim();
   if (trimmed.startsWith('[')) {
     const bracketIndex = trimmed.indexOf(']');

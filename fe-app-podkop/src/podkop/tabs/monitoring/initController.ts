@@ -165,8 +165,9 @@ function getKnownRouteTag(tag: string): string {
     return tag;
   }
   return (
-    sectionTagsLongestFirst.find((sectionTag) =>
-      tag.startsWith(`${sectionTag}/`) || tag.startsWith(`${sectionTag}-`),
+    sectionTagsLongestFirst.find(
+      (sectionTag) =>
+        tag.startsWith(`${sectionTag}/`) || tag.startsWith(`${sectionTag}-`),
     ) || ''
   );
 }

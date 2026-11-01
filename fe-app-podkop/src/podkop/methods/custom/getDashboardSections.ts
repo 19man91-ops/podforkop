@@ -95,17 +95,18 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
             (proxy) => proxy.code === `${section['.name']}-out`,
           );
 
-          let parsedOutbound: any = null;
+          let parsedOutbound: Record<string, unknown> | null = null;
           try {
             parsedOutbound = section.outbound_json
-              ? JSON.parse(section.outbound_json)
+              ? (JSON.parse(section.outbound_json) as Record<string, unknown>)
               : null;
           } catch {
             parsedOutbound = null;
           }
-          const parsedTag = parsedOutbound?.tag
-            ? decodeURIComponent(parsedOutbound?.tag)
-            : undefined;
+          const parsedTag =
+            typeof parsedOutbound?.tag === 'string'
+              ? decodeURIComponent(parsedOutbound.tag)
+              : undefined;
           const proxyDisplayName = parsedTag || outbound?.value?.name || '';
 
           return {
@@ -169,13 +170,16 @@ export async function getDashboardSections(): Promise<IGetDashboardSectionsRespo
               .map((link, index) => ({
                 link,
                 outbound: proxies.find(
-                  (item) => item.code === `${section['.name']}-${index + 1}-out`,
+                  (item) =>
+                    item.code === `${section['.name']}-${index + 1}-out`,
                 ),
               }))
               .map((item) => ({
                 code: item?.outbound?.code || '',
                 displayName:
-                  getProxyUrlName(item.link) || item?.outbound?.value?.name || '',
+                  getProxyUrlName(item.link) ||
+                  item?.outbound?.value?.name ||
+                  '',
                 latency: item?.outbound?.value?.history?.[0]?.delay || 0,
                 type: item?.outbound?.value?.type || '',
                 selected: selector?.value?.now === item?.outbound?.code,
