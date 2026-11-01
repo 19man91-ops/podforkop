@@ -378,7 +378,7 @@ install_podkop_engine() {
     msg "Installing $filename..."
     if [ "$PKG_IS_APK" -eq 1 ]; then
         local apk_conflicts=""
-        for package in sing-box-forkop sing-box sing-box-tiny podkop-engine podkop-engine-full; do
+        for package in sing-box-forkop podkop-engine podkop-engine-full; do
             if [ "$package" != "$engine_package" ]; then
                 if pkg_is_installed "$package" || ([ -f /etc/apk/world ] && grep -qx "$package" /etc/apk/world 2>/dev/null); then
                     msg "Replacing $package with $engine_package..."
@@ -389,7 +389,7 @@ install_podkop_engine() {
         # shellcheck disable=SC2086
         if ! apk add --allow-untrusted "$filepath" $apk_conflicts; then
             msg "Retrying $engine_package install with explicit conflict removal..."
-            for package in sing-box-forkop sing-box sing-box-tiny podkop-engine podkop-engine-full; do
+            for package in sing-box-forkop podkop-engine podkop-engine-full; do
                 [ "$package" = "$engine_package" ] || apk del "$package" >/dev/null 2>&1 || true
             done
             if ! apk add --allow-untrusted "$filepath"; then
@@ -484,7 +484,7 @@ install_sing_box_forkop() {
     msg "Installing $filename..."
     if [ "$PKG_IS_APK" -eq 1 ]; then
         local apk_conflicts=""
-        for package in podkop-engine podkop-engine-full sing-box sing-box-tiny; do
+        for package in podkop-engine podkop-engine-full; do
             if pkg_is_installed "$package" || ([ -f /etc/apk/world ] && grep -qx "$package" /etc/apk/world 2>/dev/null); then
                 msg "Replacing $package with sing-box-forkop..."
                 apk_conflicts="$apk_conflicts !$package"
@@ -493,7 +493,7 @@ install_sing_box_forkop() {
         # shellcheck disable=SC2086
         if ! apk add --allow-untrusted "$filepath" $apk_conflicts; then
             msg "Retrying sing-box-forkop install with explicit conflict removal..."
-            apk del podkop-engine podkop-engine-full sing-box sing-box-tiny >/dev/null 2>&1 || true
+            apk del podkop-engine podkop-engine-full >/dev/null 2>&1 || true
             if ! apk add --allow-untrusted "$filepath"; then
                 msg "Could not install sing-box-forkop. Check available flash space and package-manager output."
                 exit 1
