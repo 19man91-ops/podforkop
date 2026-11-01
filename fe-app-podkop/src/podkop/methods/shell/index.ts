@@ -134,6 +134,13 @@ export const PodkopShellMethods = {
       '/usr/bin/podkop',
       20000,
     ),
+  privacyTest: async () =>
+    callBaseMethod<Podkop.PrivacyTestResult>(
+      Podkop.AvailableMethods.PRIVACY_TEST,
+      [],
+      '/usr/bin/podkop',
+      120000,
+    ),
   speedTest: async (tag: string) =>
     callBaseMethod<Podkop.SpeedTestResult>(
       Podkop.AvailableMethods.CLASH_API,

@@ -68,6 +68,7 @@ export namespace Podkop {
     ADD_DOMAIN = 'add_domain',
     ADD_DOMAIN_EXCLUSION = 'add_domain_exclusion',
     TELEGRAM_TEST = 'telegram_test',
+    PRIVACY_TEST = 'privacy_test',
   }
 
   export enum AvailableClashAPIMethods {
@@ -173,6 +174,30 @@ export namespace Podkop {
   export interface TelegramTestResult {
     success: boolean;
     error?: string;
+  }
+
+  export interface PrivacyEgressSection {
+    section: string;
+    status: 'ok' | 'error';
+    ip: string;
+    country: string;
+  }
+
+  export interface PrivacyTestResult {
+    dns: {
+      status: 'ok' | 'warning';
+      details: string;
+    };
+    sections: PrivacyEgressSection[];
+    mtu: {
+      wan_interface: string;
+      wan_mtu: number;
+      lan_interface: string;
+      lan_mtu: number;
+      max_ping_payload: number;
+      recommended_mss: number;
+      mss_clamp_enabled: boolean;
+    };
   }
 
   export interface ConfigProxyUrlTestSection {

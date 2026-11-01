@@ -699,6 +699,7 @@ var Podkop;
     AvailableMethods2["ADD_DOMAIN"] = "add_domain";
     AvailableMethods2["ADD_DOMAIN_EXCLUSION"] = "add_domain_exclusion";
     AvailableMethods2["TELEGRAM_TEST"] = "telegram_test";
+    AvailableMethods2["PRIVACY_TEST"] = "privacy_test";
   })(AvailableMethods = Podkop2.AvailableMethods || (Podkop2.AvailableMethods = {}));
   let AvailableClashAPIMethods;
   ((AvailableClashAPIMethods2) => {
@@ -818,6 +819,12 @@ var PodkopShellMethods = {
     [],
     "/usr/bin/podkop",
     2e4
+  ),
+  privacyTest: async () => callBaseMethod(
+    Podkop.AvailableMethods.PRIVACY_TEST,
+    [],
+    "/usr/bin/podkop",
+    12e4
   ),
   speedTest: async (tag) => callBaseMethod(
     Podkop.AvailableMethods.CLASH_API,
@@ -1505,6 +1512,9 @@ var initialDiagnosticStore = {
       loading: false
     },
     showSingBoxConfig: {
+      loading: false
+    },
+    privacyTest: {
       loading: false
     }
   },
@@ -5086,7 +5096,8 @@ function renderAvailableActions({
   disable,
   globalCheck,
   viewLogs,
-  showSingBoxConfig
+  showSingBoxConfig,
+  privacyTest
 }) {
   return E("div", { class: "pdk_diagnostic-page__right-bar__actions" }, [
     E("b", {}, _("Available actions")),
@@ -5156,6 +5167,15 @@ function renderAvailableActions({
         text: _("View logs"),
         loading: viewLogs.loading,
         disabled: viewLogs.disabled
+      })
+    ]),
+    ...insertIf(privacyTest.visible, [
+      renderButton({
+        onClick: privacyTest.onClick,
+        icon: renderCircleCheckBigIcon24,
+        text: _("Privacy & leak test"),
+        loading: privacyTest.loading,
+        disabled: privacyTest.disabled
       })
     ]),
     ...insertIf(showSingBoxConfig.visible, [
@@ -5723,6 +5743,57 @@ async function handleDisable() {
     });
   }
 }
+async function handlePrivacyTest() {
+  const diagnosticsActions = store.get().diagnosticsActions;
+  store.set({
+    diagnosticsActions: {
+      ...diagnosticsActions,
+      privacyTest: { loading: true }
+    }
+  });
+  try {
+    const response = await PodkopShellMethods.privacyTest();
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+    const data = response.data;
+    ui.showModal(
+      _("Privacy & leak test"),
+      E("div", { class: "pdk_diagnostic-page__privacy" }, [
+        E("h4", {}, _("DNS leak test")),
+        E("p", {}, [
+          `${data.dns.status === "ok" ? _("No leaks detected") : _("Check recommended")}. ${data.dns.details}`
+        ]),
+        E("h4", {}, _("Egress IP by section")),
+        ...data.sections.length ? data.sections.map(
+          (section) => E("p", {}, [
+            `${section.section}: ${section.status === "ok" ? `${section.ip} (${section.country})` : _("unavailable")}`
+          ])
+        ) : [E("p", {}, _("No proxy sections"))],
+        E("h4", {}, _("MTU / MSS")),
+        E("p", {}, [
+          `${_("WAN")}: ${data.mtu.wan_interface} \u2014 MTU ${data.mtu.wan_mtu}`
+        ]),
+        E("p", {}, [
+          `${_("LAN")}: ${data.mtu.lan_interface} \u2014 MTU ${data.mtu.lan_mtu}`
+        ]),
+        E("p", {}, [
+          `${_("Max ping payload")}: ${data.mtu.max_ping_payload}; ${_("Recommended MSS")}: ${data.mtu.recommended_mss} (${data.mtu.mss_clamp_enabled ? _("MSS clamp enabled") : _("MSS clamp not found")})`
+        ])
+      ])
+    );
+  } catch (e) {
+    logger.error("[DIAGNOSTIC]", "handlePrivacyTest - e", e);
+    showToast(_("Failed to run privacy test"), "error");
+  } finally {
+    store.set({
+      diagnosticsActions: {
+        ...store.get().diagnosticsActions,
+        privacyTest: { loading: false }
+      }
+    });
+  }
+}
 async function handleShowGlobalCheck() {
   const diagnosticsActions = store.get().diagnosticsActions;
   store.set({
@@ -5889,6 +5960,12 @@ function renderDiagnosticAvailableActionsWidget() {
       loading: diagnosticsActions.viewLogs.loading,
       visible: true,
       onClick: handleViewLogs,
+      disabled: atLeastOneServiceCommandLoading
+    },
+    privacyTest: {
+      loading: diagnosticsActions.privacyTest.loading,
+      visible: true,
+      onClick: handlePrivacyTest,
       disabled: atLeastOneServiceCommandLoading
     },
     showSingBoxConfig: {

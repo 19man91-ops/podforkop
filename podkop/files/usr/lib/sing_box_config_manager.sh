@@ -1091,8 +1091,33 @@ sing_box_cm_add_local_subscription_provider() {
         }])'
 }
 
-sing_box_cm_add_group_providers() {
+#######################################
+# Apply a uTLS fingerprint to all TLS outbounds created for a section.
+# Arguments:
+#   config: string (JSON), sing-box configuration to modify
+#   section: string, section id (outbound tag prefix)
+#   fingerprint: string, uTLS fingerprint (chrome, firefox, safari, ios, edge, randomized)
+# Outputs:
+#   Writes updated JSON configuration to stdout
+#######################################
+sing_box_cm_apply_section_utls() {
     local config="$1"
+    local section="$2"
+    local fingerprint="$3"
+
+    echo "$config" | jq \
+        --arg prefix "${section}-" \
+        --arg fingerprint "$fingerprint" \
+        '.outbounds |= map(
+            if ((.tag // "") | startswith($prefix)) and (.tls != null) then
+                .tls.utls = { enabled: true, fingerprint: $fingerprint }
+            else
+                .
+            end
+        )'
+}
+
+sing_box_cm_add_group_providers() {    local config="$1"
     local group_tag="$2"
     local providers="$3"
 

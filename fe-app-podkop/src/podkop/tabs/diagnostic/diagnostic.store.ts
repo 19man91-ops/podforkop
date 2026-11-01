@@ -45,6 +45,9 @@ export const initialDiagnosticStore: Pick<
     showSingBoxConfig: {
       loading: false,
     },
+    privacyTest: {
+      loading: false,
+    },
   },
   diagnosticsRunAction: { loading: false },
   diagnosticsChecks: [

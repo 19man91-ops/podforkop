@@ -1155,3 +1155,58 @@ msgstr "График трафика"
 msgid "Waiting for traffic data..."
 msgstr "Ожидание данных о трафике..."
 
+
+msgid "Check recommended"
+msgstr "Рекомендуется проверка"
+
+msgid "DNS leak test"
+msgstr "Тест утечек DNS"
+
+msgid "Egress IP by section"
+msgstr "Внешний IP по секциям"
+
+msgid "Failed to run privacy test"
+msgstr "Не удалось выполнить тест приватности"
+
+msgid "LAN"
+msgstr "LAN"
+
+msgid "Max ping payload"
+msgstr "Макс. размер ping-пакета"
+
+msgid "Mimic a real browser TLS fingerprint with uTLS, so DPI systems see regular browser traffic instead of a proxy"
+msgstr "Маскировать TLS-отпечаток как у реального браузера через uTLS, чтобы DPI видел обычный браузерный трафик вместо прокси"
+
+msgid "MSS clamp enabled"
+msgstr "MSS clamp включён"
+
+msgid "MSS clamp not found"
+msgstr "MSS clamp не найден"
+
+msgid "MTU / MSS"
+msgstr "MTU / MSS"
+
+msgid "No leaks detected"
+msgstr "Утечек не обнаружено"
+
+msgid "No proxy sections"
+msgstr "Нет прокси-секций"
+
+msgid "Privacy & leak test"
+msgstr "Тест приватности и утечек"
+
+msgid "Randomized"
+msgstr "Случайный"
+
+msgid "Recommended MSS"
+msgstr "Рекомендуемый MSS"
+
+msgid "TLS fingerprint (Anti-DPI)"
+msgstr "TLS-отпечаток (Anti-DPI)"
+
+msgid "unavailable"
+msgstr "недоступно"
+
+msgid "WAN"
+msgstr "WAN"
+

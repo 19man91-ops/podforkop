@@ -159,6 +159,11 @@ url_decode() {
     printf '%b' "$(echo "$encoded" | sed 's/+/ /g; s/%/\\x/g')"
 }
 
+# Checks whether the installed sing-box was built with uTLS support
+sing_box_supports_utls() {
+    sing-box version 2> /dev/null | grep -q 'with_utls'
+}
+
 # Prints the features the installed sing-box reports in the "Features:" line of
 # "sing-box version", comma-separated; nothing for a sing-box without that line
 sing_box_get_features() {
@@ -171,6 +176,12 @@ sing_box_get_features() {
         # Advertising unsupported features makes the UI generate a config that
         # forkop's strict JSON parser rejects, so only claim what really exists.
         features="subscription_providers"
+    fi
+    if sing_box_supports_utls; then
+        case ",$features," in
+        *",tls.utls,"*) ;;
+        *) features="${features:+$features,}tls.utls" ;;
+        esac
     fi
     echo "$features"
 }

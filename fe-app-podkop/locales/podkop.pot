@@ -1500,3 +1500,58 @@ msgstr ""
 msgid "Waiting for traffic data..."
 msgstr ""
 
+
+msgid "Check recommended"
+msgstr ""
+
+msgid "DNS leak test"
+msgstr ""
+
+msgid "Egress IP by section"
+msgstr ""
+
+msgid "Failed to run privacy test"
+msgstr ""
+
+msgid "LAN"
+msgstr ""
+
+msgid "Max ping payload"
+msgstr ""
+
+msgid "Mimic a real browser TLS fingerprint with uTLS, so DPI systems see regular browser traffic instead of a proxy"
+msgstr ""
+
+msgid "MSS clamp enabled"
+msgstr ""
+
+msgid "MSS clamp not found"
+msgstr ""
+
+msgid "MTU / MSS"
+msgstr ""
+
+msgid "No leaks detected"
+msgstr ""
+
+msgid "No proxy sections"
+msgstr ""
+
+msgid "Privacy & leak test"
+msgstr ""
+
+msgid "Randomized"
+msgstr ""
+
+msgid "Recommended MSS"
+msgstr ""
+
+msgid "TLS fingerprint (Anti-DPI)"
+msgstr ""
+
+msgid "unavailable"
+msgstr ""
+
+msgid "WAN"
+msgstr ""
+

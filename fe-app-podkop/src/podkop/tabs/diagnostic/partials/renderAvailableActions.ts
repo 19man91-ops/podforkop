@@ -27,6 +27,7 @@ interface IRenderAvailableActionsProps {
   globalCheck: ActionProps;
   viewLogs: ActionProps;
   showSingBoxConfig: ActionProps;
+  privacyTest: ActionProps;
 }
 
 export function renderAvailableActions({
@@ -38,6 +39,7 @@ export function renderAvailableActions({
   globalCheck,
   viewLogs,
   showSingBoxConfig,
+  privacyTest,
 }: IRenderAvailableActionsProps) {
   return E('div', { class: 'pdk_diagnostic-page__right-bar__actions' }, [
     E('b', {}, _('Available actions')),
@@ -107,6 +109,15 @@ export function renderAvailableActions({
         text: _('View logs'),
         loading: viewLogs.loading,
         disabled: viewLogs.disabled,
+      }),
+    ]),
+    ...insertIf(privacyTest.visible, [
+      renderButton({
+        onClick: privacyTest.onClick,
+        icon: renderCircleCheckBigIcon24,
+        text: _('Privacy & leak test'),
+        loading: privacyTest.loading,
+        disabled: privacyTest.disabled,
       }),
     ]),
     ...insertIf(showSingBoxConfig.visible, [

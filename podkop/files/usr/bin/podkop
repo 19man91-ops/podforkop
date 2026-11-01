@@ -914,6 +914,18 @@ configure_outbound_handler() {
         exit 1
         ;;
     esac
+
+    # Optional per-section TLS fingerprint masking (uTLS anti-DPI)
+    if sing_box_supports_utls; then
+        local utls_fingerprint
+        config_get utls_fingerprint "$section" "utls_fingerprint" "disabled"
+        case "$utls_fingerprint" in
+        chrome | firefox | safari | ios | edge | randomized)
+            log "Applying uTLS fingerprint '$utls_fingerprint' to the $section section" "debug"
+            config=$(sing_box_cm_apply_section_utls "$config" "$section" "$utls_fingerprint")
+            ;;
+        esac
+    fi
 }
 
 sing_box_configure_dns() {
@@ -3124,6 +3136,140 @@ telegram_test() {
     fi
 }
 
+PODKOP_PRIVACY_EGRESS_INDEX=0
+PODKOP_PRIVACY_EGRESS_FILE=""
+PODKOP_PRIVACY_CONFIG_PATH=""
+
+privacy_test_fetch_json() {
+    local tag="$1"
+
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 8 sing-box -c "$PODKOP_PRIVACY_CONFIG_PATH" tools fetch -o "$tag" "https://api.myip.com" 2>/dev/null
+    else
+        sing-box -c "$PODKOP_PRIVACY_CONFIG_PATH" tools fetch -o "$tag" "https://api.myip.com" 2>/dev/null
+    fi
+}
+
+privacy_test_collect_section() {
+    local section="$1"
+    local connection_type proxy_config_type tag output ip country
+
+    section_is_enabled "$section" || return 0
+    config_get connection_type "$section" "connection_type"
+    [ "$connection_type" = "proxy" ] || return 0
+
+    PODKOP_PRIVACY_EGRESS_INDEX=$((PODKOP_PRIVACY_EGRESS_INDEX + 1))
+    [ "$PODKOP_PRIVACY_EGRESS_INDEX" -le 4 ] || return 0
+
+    tag="$(get_outbound_tag_by_section "$section")"
+    output="$(privacy_test_fetch_json "$tag")"
+    ip=$(printf '%s' "$output" | jq -r '.ip // empty' 2>/dev/null)
+    country=$(printf '%s' "$output" | jq -r '.country // empty' 2>/dev/null)
+
+    if [ -n "$ip" ]; then
+        jq -nc --arg section "$section" --arg ip "$ip" --arg country "$country" --arg status "ok" \
+            '{section:$section,status:$status,ip:$ip,country:$country}' >> "$PODKOP_PRIVACY_EGRESS_FILE"
+    else
+        jq -nc --arg section "$section" --arg status "error" \
+            '{section:$section,status:$status,ip:"",country:""}' >> "$PODKOP_PRIVACY_EGRESS_FILE"
+    fi
+}
+
+# Privacy & leak test: DNS leak, per-section egress IP/geolocation, MTU/MSS.
+privacy_test() {
+    local config_path dns_status dns_details servers noresolv resolv_nameserver fakeip fakeip_ok
+    local egress_file wan_if wan_mtu lan_if lan_mtu max_ping mss mss_clamp
+    local source_network_interfaces
+
+    config_get config_path "settings" "config_path"
+    [ -n "$config_path" ] || config_path="/etc/sing-box/config.json"
+    PODKOP_PRIVACY_CONFIG_PATH="$config_path"
+
+    # --- DNS leak checks -------------------------------------------------
+    servers=$(uci_get dhcp "@dnsmasq[0]" "server")
+    noresolv=$(uci_get dhcp "@dnsmasq[0]" "noresolv")
+    resolv_nameserver=$(grep -m1 '^[[:space:]]*nameserver' /tmp/resolv.conf.d/resolv.conf.auto 2>/dev/null | awk '{print $2}')
+    fakeip=$(dig +short @127.0.0.42 "$FAKEIP_TEST_DOMAIN" 2>/dev/null | head -n 1)
+    case "$fakeip" in
+    198.18.*) fakeip_ok=1 ;;
+    *) fakeip_ok=0 ;;
+    esac
+
+    dns_details=""
+    [ -n "$servers" ] && dns_details="dnsmasq server: ${servers}; "
+    dns_details="${dns_details}noresolv: ${noresolv:-0}; "
+    [ -n "$resolv_nameserver" ] && dns_details="${dns_details}resolv: ${resolv_nameserver}; "
+    dns_details="${dns_details}fakeip: ${fakeip:-none};"
+
+    if printf '%s' "$servers" | grep -q "$SB_DNS_INBOUND_ADDRESS" &&
+        [ "${noresolv:-0}" = "1" ] && [ "$fakeip_ok" -eq 1 ]; then
+        dns_status="ok"
+    else
+        dns_status="warning"
+    fi
+
+    # --- Egress IP / geolocation per section -----------------------------
+    egress_file=$(mktemp)
+    PODKOP_PRIVACY_EGRESS_FILE="$egress_file"
+    PODKOP_PRIVACY_EGRESS_INDEX=0
+    config_foreach privacy_test_collect_section "section"
+
+    # --- MTU / MSS -------------------------------------------------------
+    wan_if=$(ip route show default 2>/dev/null | awk '/default/ {print $5; exit}')
+    wan_mtu=0
+    [ -n "$wan_if" ] && wan_mtu=$(cat "/sys/class/net/${wan_if}/mtu" 2>/dev/null)
+    case "$wan_mtu" in '' | *[!0-9]*) wan_mtu=0 ;; esac
+
+    config_get source_network_interfaces "settings" "source_network_interfaces" "br-lan"
+    lan_if="${source_network_interfaces%% *}"
+    lan_mtu=0
+    [ -n "$lan_if" ] && lan_mtu=$(cat "/sys/class/net/${lan_if}/mtu" 2>/dev/null)
+    case "$lan_mtu" in '' | *[!0-9]*) lan_mtu=0 ;; esac
+
+    mss_clamp=0
+    if nft list ruleset 2>/dev/null | grep -q 'maxseg size'; then
+        mss_clamp=1
+    fi
+
+    max_ping=0
+    for size in 1472 1464 1400 1350 1200; do
+        if ping -q -c 1 -W 2 -M do -s "$size" 1.1.1.1 >/dev/null 2>&1; then
+            max_ping=$size
+            break
+        fi
+    done
+
+    mss=0
+    [ "$wan_mtu" -gt 40 ] && mss=$((wan_mtu - 40))
+
+    jq -n \
+        --arg dns_status "$dns_status" \
+        --arg dns_details "$dns_details" \
+        --argjson sections "$(jq -s '.' "$egress_file")" \
+        --arg wan_if "$wan_if" \
+        --argjson wan_mtu "$wan_mtu" \
+        --arg lan_if "$lan_if" \
+        --argjson lan_mtu "$lan_mtu" \
+        --argjson max_ping "$max_ping" \
+        --argjson mss "$mss" \
+        --argjson mss_clamp "$mss_clamp" \
+        '{
+            dns: {status: $dns_status, details: $dns_details},
+            sections: $sections,
+            mtu: {
+                wan_interface: $wan_if,
+                wan_mtu: $wan_mtu,
+                lan_interface: $lan_if,
+                lan_mtu: $lan_mtu,
+                max_ping_payload: $max_ping,
+                recommended_mss: $mss,
+                mss_clamp_enabled: ($mss_clamp == 1)
+            }
+        }'
+
+    rm -f "$egress_file"
+}
+
 show_help() {
     cat << EOF
 Usage: $0 COMMAND
@@ -3138,6 +3284,7 @@ Available commands:
     list_update             Update domain lists
     subscription_update     Update proxy subscriptions
     subscription_info       Show subscription traffic/expiry info in JSON format
+    privacy_test            Run DNS leak, egress IP and MTU/MSS checks
     add_domain              Add a domain to a section's user domain list
     add_domain_exclusion    Add a domain to the exclusion section
     telegram_test           Send a test Telegram notification
@@ -3187,6 +3334,9 @@ list_update)
     ;;
 subscription_update)
     subscription_update
+    ;;
+privacy_test)
+    privacy_test
     ;;
 subscription_info)
     subscription_info_show "${2:-}"

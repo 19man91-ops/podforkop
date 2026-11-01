@@ -97,6 +97,27 @@ function createSectionContent(section, singBoxFeatures = [], deviceChoices = [])
   o.cfgvalue = o.textvalue;
   o.rawhtml = true;
 
+  if (singBoxFeatures.includes("tls.utls")) {
+    o = section.option(
+      form.ListValue,
+      "utls_fingerprint",
+      _("TLS fingerprint (Anti-DPI)"),
+      _(
+        "Mimic a real browser TLS fingerprint with uTLS, so DPI systems see regular browser traffic instead of a proxy",
+      ),
+    );
+    o.value("disabled", _("Disabled"));
+    o.value("chrome", "Chrome");
+    o.value("firefox", "Firefox");
+    o.value("safari", "Safari (macOS)");
+    o.value("ios", "Safari (iOS)");
+    o.value("edge", "Edge");
+    o.value("randomized", _("Randomized"));
+    o.default = "disabled";
+    o.rmempty = false;
+    o.depends("connection_type", "proxy");
+  }
+
   o = section.option(
     form.ListValue,
     "connection_type",

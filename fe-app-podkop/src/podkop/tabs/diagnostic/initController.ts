@@ -205,6 +205,72 @@ async function handleDisable() {
   }
 }
 
+async function handlePrivacyTest() {
+  const diagnosticsActions = store.get().diagnosticsActions;
+  store.set({
+    diagnosticsActions: {
+      ...diagnosticsActions,
+      privacyTest: { loading: true },
+    },
+  });
+
+  try {
+    const response = await PodkopShellMethods.privacyTest();
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    const data = response.data;
+
+    ui.showModal(
+      _('Privacy & leak test'),
+      E('div', { class: 'pdk_diagnostic-page__privacy' }, [
+        E('h4', {}, _('DNS leak test')),
+        E('p', {}, [
+          `${data.dns.status === 'ok' ? _('No leaks detected') : _('Check recommended')}. ${data.dns.details}`,
+        ]),
+        E('h4', {}, _('Egress IP by section')),
+        ...(data.sections.length
+          ? data.sections.map((section) =>
+              E('p', {}, [
+                `${section.section}: ${
+                  section.status === 'ok'
+                    ? `${section.ip} (${section.country})`
+                    : _('unavailable')
+                }`,
+              ]),
+            )
+          : [E('p', {}, _('No proxy sections'))]),
+        E('h4', {}, _('MTU / MSS')),
+        E('p', {}, [
+          `${_('WAN')}: ${data.mtu.wan_interface} — MTU ${data.mtu.wan_mtu}`,
+        ]),
+        E('p', {}, [
+          `${_('LAN')}: ${data.mtu.lan_interface} — MTU ${data.mtu.lan_mtu}`,
+        ]),
+        E('p', {}, [
+          `${_('Max ping payload')}: ${data.mtu.max_ping_payload}; ${_('Recommended MSS')}: ${data.mtu.recommended_mss} (${
+            data.mtu.mss_clamp_enabled
+              ? _('MSS clamp enabled')
+              : _('MSS clamp not found')
+          })`,
+        ]),
+      ]),
+    );
+  } catch (e) {
+    logger.error('[DIAGNOSTIC]', 'handlePrivacyTest - e', e);
+    showToast(_('Failed to run privacy test'), 'error');
+  } finally {
+    store.set({
+      diagnosticsActions: {
+        ...store.get().diagnosticsActions,
+        privacyTest: { loading: false },
+      },
+    });
+  }
+}
+
 async function handleShowGlobalCheck() {
   const diagnosticsActions = store.get().diagnosticsActions;
   store.set({
@@ -394,6 +460,12 @@ function renderDiagnosticAvailableActionsWidget() {
       loading: diagnosticsActions.viewLogs.loading,
       visible: true,
       onClick: handleViewLogs,
+      disabled: atLeastOneServiceCommandLoading,
+    },
+    privacyTest: {
+      loading: diagnosticsActions.privacyTest.loading,
+      visible: true,
+      onClick: handlePrivacyTest,
       disabled: atLeastOneServiceCommandLoading,
     },
     showSingBoxConfig: {
