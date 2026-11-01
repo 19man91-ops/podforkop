@@ -5635,7 +5635,10 @@ function getRpcObj() {
   const g = globalThis;
   if (g.L?.rpc) return g.L.rpc;
   if (g.rpc) return g.rpc;
-  if (typeof window !== "undefined" && window.L?.rpc) return window.L.rpc;
+  if (typeof window !== "undefined") {
+    const w = window;
+    if (w.L?.rpc) return w.L.rpc;
+  }
   return void 0;
 }
 function initRpcCalls() {
@@ -5688,9 +5691,10 @@ function loadLocalDevices() {
   const hostHintsPromise = typeof callHostHints === "function" ? callHostHints().catch(() => ({})) : Promise.resolve({});
   const dhcpLeasesPromise = typeof callDHCPLeases === "function" ? callDHCPLeases().catch(() => ({})) : Promise.resolve({});
   const networkDumpPromise = typeof callNetworkInterfaceDump === "function" ? callNetworkInterfaceDump().catch(() => ({})) : Promise.resolve({});
-  const uciObj = typeof uci !== "undefined" && uci || globalThis.L?.uci || globalThis.uci;
+  const g = globalThis;
+  const uciObj = typeof uci !== "undefined" && uci || g.L?.uci || g.uci;
   const uciDhcpPromise = uciObj && typeof uciObj.load === "function" ? uciObj.load("dhcp").then(() => uciObj.sections("dhcp", "host")).catch(() => []) : Promise.resolve([]);
-  const fsObj = typeof fs !== "undefined" && fs || globalThis.L?.fs || globalThis.fs;
+  const fsObj = typeof fs !== "undefined" && fs || g.L?.fs || g.fs;
   const leasesFilePromise = fsObj && typeof fsObj.read_direct === "function" ? fsObj.read_direct("/tmp/dhcp.leases").catch(() => "") : Promise.resolve("");
   localDevicesPromise = Promise.all([
     hostHintsPromise,
@@ -5752,11 +5756,13 @@ function loadLocalDevices() {
           if (ip && name && validateIP(ip).valid) names[ip] = name;
         });
       }
-      const ifaceList = Array.isArray(networkInterfaces) ? networkInterfaces : networkInterfaces?.interface;
+      const ifaceList = Array.isArray(
+        networkInterfaces
+      ) ? networkInterfaces : networkInterfaces?.interface ?? [];
       if (Array.isArray(ifaceList)) {
         ifaceList.forEach((iface) => {
-          const ipv4 = Array.isArray(iface?.["ipv4-address"]) ? iface["ipv4-address"] : [];
-          const ipv6 = Array.isArray(iface?.["ipv6-address"]) ? iface["ipv6-address"] : [];
+          const ipv4 = Array.isArray(iface["ipv4-address"]) ? iface["ipv4-address"] : [];
+          const ipv6 = Array.isArray(iface["ipv6-address"]) ? iface["ipv6-address"] : [];
           [...ipv4, ...ipv6].forEach((addr) => {
             const ip = typeof addr === "string" ? addr : addr?.address;
             if (ip && names[ip]) {

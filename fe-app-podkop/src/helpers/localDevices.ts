@@ -27,12 +27,56 @@ interface StaticHostRecord {
   ip?: string;
 }
 
-function getRpcObj(): any {
-  if (typeof rpc !== 'undefined' && rpc) return rpc;
-  const g = globalThis as any;
+interface NetworkInterfaceAddress {
+  address?: string;
+}
+
+interface NetworkInterfaceItem {
+  'ipv4-address'?: (string | NetworkInterfaceAddress)[];
+  'ipv6-address'?: (string | NetworkInterfaceAddress)[];
+}
+
+interface NetworkInterfacePayload {
+  interface?: NetworkInterfaceItem[];
+}
+
+interface LuciRpcObject {
+  declare: (options: {
+    object: string;
+    method: string;
+    expect?: Record<string, unknown>;
+  }) => RpcCallFn;
+}
+
+interface LuciUciObject {
+  load: (package_name: string) => Promise<unknown>;
+  sections: (package_name: string, type: string) => StaticHostRecord[];
+}
+
+interface LuciFsObject {
+  read_direct: (path: string) => Promise<string>;
+}
+
+interface GlobalLuciContext {
+  rpc?: LuciRpcObject;
+  uci?: LuciUciObject;
+  fs?: LuciFsObject;
+  L?: {
+    rpc?: LuciRpcObject;
+    uci?: LuciUciObject;
+    fs?: LuciFsObject;
+  };
+}
+
+function getRpcObj(): LuciRpcObject | undefined {
+  if (typeof rpc !== 'undefined' && rpc) return rpc as unknown as LuciRpcObject;
+  const g = globalThis as unknown as GlobalLuciContext;
   if (g.L?.rpc) return g.L.rpc;
   if (g.rpc) return g.rpc;
-  if (typeof window !== 'undefined' && (window as any).L?.rpc) return (window as any).L.rpc;
+  if (typeof window !== 'undefined') {
+    const w = window as unknown as GlobalLuciContext;
+    if (w.L?.rpc) return w.L.rpc;
+  }
   return undefined;
 }
 
@@ -113,10 +157,12 @@ export function loadLocalDevices(): Promise<LocalDevices> {
       ? callNetworkInterfaceDump().catch(() => ({}))
       : Promise.resolve({});
 
+  const g = globalThis as unknown as GlobalLuciContext;
+
   const uciObj =
-    (typeof uci !== 'undefined' && uci) ||
-    (globalThis as any).L?.uci ||
-    (globalThis as any).uci;
+    (typeof uci !== 'undefined' && (uci as unknown as LuciUciObject)) ||
+    g.L?.uci ||
+    g.uci;
 
   const uciDhcpPromise =
     uciObj && typeof uciObj.load === 'function'
@@ -127,9 +173,9 @@ export function loadLocalDevices(): Promise<LocalDevices> {
       : Promise.resolve([]);
 
   const fsObj =
-    (typeof fs !== 'undefined' && fs) ||
-    (globalThis as any).L?.fs ||
-    (globalThis as any).fs;
+    (typeof fs !== 'undefined' && (fs as unknown as LuciFsObject)) ||
+    g.L?.fs ||
+    g.fs;
 
   const leasesFilePromise =
     fsObj && typeof fsObj.read_direct === 'function'
@@ -210,18 +256,20 @@ export function loadLocalDevices(): Promise<LocalDevices> {
         }
 
         // Exclude the router's own IPs so they are not misattributed
-        const ifaceList = Array.isArray(networkInterfaces)
-          ? networkInterfaces
-          : (networkInterfaces as any)?.interface;
+        const ifaceList: NetworkInterfaceItem[] = Array.isArray(
+          networkInterfaces,
+        )
+          ? (networkInterfaces as NetworkInterfaceItem[])
+          : ((networkInterfaces as NetworkInterfacePayload)?.interface ?? []);
         if (Array.isArray(ifaceList)) {
-          ifaceList.forEach((iface: any) => {
-            const ipv4 = Array.isArray(iface?.['ipv4-address'])
+          ifaceList.forEach((iface) => {
+            const ipv4 = Array.isArray(iface['ipv4-address'])
               ? iface['ipv4-address']
               : [];
-            const ipv6 = Array.isArray(iface?.['ipv6-address'])
+            const ipv6 = Array.isArray(iface['ipv6-address'])
               ? iface['ipv6-address']
               : [];
-            [...ipv4, ...ipv6].forEach((addr: any) => {
+            [...ipv4, ...ipv6].forEach((addr) => {
               const ip = typeof addr === 'string' ? addr : addr?.address;
               if (ip && names[ip]) {
                 delete names[ip];
