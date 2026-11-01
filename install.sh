@@ -1,9 +1,7 @@
 #!/bin/sh
 # shellcheck shell=dash
 
-REPO="https://api.github.com/repos/19man91-ops/podforkop/releases/latest"
-ENGINE_REPO="https://api.github.com/repos/19man91-ops/podforkop/releases/tags/podkop-engine-current"
-FORKOP_CORE_REPO="https://api.github.com/repos/19man91-ops/podforkop/releases/tags/sing-box-forkop-current"
+GITHUB_REPO="19man91-ops/podforkop"
 DOWNLOAD_DIR="/tmp/podkop"
 COUNT=3
 
@@ -16,6 +14,52 @@ mkdir -p "$DOWNLOAD_DIR"
 
 msg() {
     printf "\033[32;1m%s\033[0m\n" "$1"
+}
+
+download_asset() {
+    local filename="$1"
+    local browser_url="$2"
+    local api_url="${3:-}"
+    local filepath="$DOWNLOAD_DIR/$filename"
+    local attempt=0
+
+    while [ "$attempt" -lt "$COUNT" ]; do
+        msg "Download $filename (count $((attempt + 1)))..."
+        # 1. Direct release download (not subject to GitHub API rate limits)
+        if [ -n "$browser_url" ]; then
+            if command -v curl >/dev/null 2>&1; then
+                curl -fsSL -o "$filepath" "$browser_url" 2>/dev/null
+            else
+                wget -q -O "$filepath" "$browser_url" 2>/dev/null
+            fi
+            if [ -s "$filepath" ]; then
+                msg "$filename successfully downloaded"
+                return 0
+            fi
+            rm -f "$filepath"
+        fi
+
+        # 2. GitHub API asset download fallback
+        if [ -n "$api_url" ]; then
+            if command -v curl >/dev/null 2>&1; then
+                curl -fsSL -H "Accept: application/octet-stream" -o "$filepath" "$api_url" 2>/dev/null
+            else
+                wget -q --header="Accept: application/octet-stream" -O "$filepath" "$api_url" 2>/dev/null
+            fi
+            if [ -s "$filepath" ]; then
+                msg "$filename successfully downloaded"
+                return 0
+            fi
+            rm -f "$filepath"
+        fi
+
+        msg "Download error for $filename. Retrying..."
+        attempt=$((attempt + 1))
+        sleep 1
+    done
+
+    msg "Failed to download $filename after $COUNT attempts"
+    return 1
 }
 
 pkg_is_installed () {
@@ -132,14 +176,9 @@ main() {
         msg "Installing podkop..."
     fi
 
-    if command -v curl >/dev/null 2>&1; then
-        check_response=$(curl -s "https://api.github.com/repos/19man91-ops/podforkop/releases/latest")
-
-        if echo "$check_response" | grep -q 'API rate limit '; then
-            msg "You've reached the GitHub rate limit. Repeat in five minutes."
-            exit 1
-        fi
-    fi
+    local version=""
+    version=$(wget -qO- "https://raw.githubusercontent.com/19man91-ops/podforkop/main/VERSION" 2>/dev/null | tr -d '\r\n')
+    [ -n "$version" ] || version="0.8.4"
 
     local pkg_ext
     if [ "$PKG_IS_APK" -eq 1 ]; then
@@ -148,32 +187,20 @@ main() {
         pkg_ext=ipk
     fi
 
-    # Download assets through api.github.com, not browser_download_url: the 302 from
-    # github.com carries a ~9KB Content-Security-Policy header and uclient-fetch
-    # (/usr/bin/wget) stalls until timeout on header lines over its 4KB read buffer
-    wget -qO- "$REPO" | tr '{' '\n' \
-        | sed -n "s|.*\"url\":\"\([^\"]*/releases/assets/[0-9]*\)\".*\"name\":\"\([^\"]*\.$pkg_ext\)\".*|\1 \2|p" \
-        | while read -r url filename; do
-        filepath="$DOWNLOAD_DIR/$filename"
+    local luci_pkg ru_pkg podkop_pkg
+    if [ "$pkg_ext" = "apk" ]; then
+        luci_pkg="luci-app-podkop-${version}-r1.apk"
+        ru_pkg="luci-i18n-podkop-ru-${version}.apk"
+        podkop_pkg="podkop-${version}-r1.apk"
+    else
+        luci_pkg="luci-app-podkop-v${version}-r1-all.ipk"
+        ru_pkg="luci-i18n-podkop-ru-${version}.ipk"
+        podkop_pkg="podkop-v${version}-r1-all.ipk"
+    fi
 
-        attempt=0
-        while [ $attempt -lt $COUNT ]; do
-            msg "Download $filename (count $((attempt+1)))..."
-            if wget -q --header="Accept: application/octet-stream" -O "$filepath" "$url"; then
-                if [ -s "$filepath" ]; then
-                    msg "$filename successfully downloaded"
-                    break
-                fi
-            fi
-            msg "Download error for $filename. Retrying..."
-            rm -f "$filepath"
-            attempt=$((attempt+1))
-        done
-
-        if [ $attempt -eq $COUNT ]; then
-            msg "Failed to download $filename after $COUNT attempts"
-        fi
-    done
+    download_asset "$luci_pkg" "https://github.com/19man91-ops/podforkop/releases/download/${version}/${luci_pkg}"
+    download_asset "$ru_pkg" "https://github.com/19man91-ops/podforkop/releases/download/${version}/${ru_pkg}"
+    download_asset "$podkop_pkg" "https://github.com/19man91-ops/podforkop/releases/download/${version}/${podkop_pkg}"
 
     # Check if any files were downloaded
     if ! ls "$DOWNLOAD_DIR"/*podkop* >/dev/null 2>&1; then
@@ -295,52 +322,39 @@ install_podkop_engine() {
     }
 
     msg "Finding $engine_package package for $arch..."
-    release_data="$DOWNLOAD_DIR/podkop-engine-release.json"
-    if ! wget -q -O "$release_data" "$ENGINE_REPO"; then
-        msg "Could not read the podkop-engine package mirror from the PodForCOP repository."
-        exit 1
-    fi
-
-    asset=$(tr '{' '\n' < "$release_data" \
-        | sed -n "s|.*\"url\":\"\([^\"]*/releases/assets/[0-9]*\)\".*\"name\":\"\(${engine_package}_[^\"]*_openwrt_${arch}\.${pkg_ext}\)\".*|\1 \2|p" \
-        | head -n 1)
-    if [ -z "$asset" ]; then
-        msg "The PodForCOP podkop-engine mirror has no $pkg_ext package for OpenWrt architecture $arch."
-        exit 1
-    fi
-
-    checksum_url=$(tr '{' '\n' < "$release_data" \
-        | sed -n 's|.*"url":"\([^"]*/releases/assets/[0-9]*\)".*"name":"SHA256SUMS".*|\1|p' \
-        | head -n 1)
-    if [ -z "$checksum_url" ]; then
-        msg "The podkop-engine mirror has no SHA256SUMS asset."
-        exit 1
-    fi
     checksum_file="$DOWNLOAD_DIR/podkop-engine-SHA256SUMS"
-    if ! wget -q --header="Accept: application/octet-stream" -O "$checksum_file" "$checksum_url" \
-        || [ ! -s "$checksum_file" ]; then
+    if ! download_asset "podkop-engine-SHA256SUMS" \
+        "https://github.com/19man91-ops/podforkop/releases/download/podkop-engine-current/SHA256SUMS"; then
         msg "Could not download podkop-engine checksums."
         exit 1
     fi
 
-    filename=${asset#* }
-    filepath="$DOWNLOAD_DIR/$filename"
-    attempt=0
-    while [ "$attempt" -lt "$COUNT" ]; do
-        msg "Downloading $filename (attempt $((attempt + 1)))..."
-        if wget -q --header="Accept: application/octet-stream" -O "$filepath" "${asset%% *}" \
-            && [ -s "$filepath" ]; then
-            break
-        fi
-        rm -f "$filepath"
-        attempt=$((attempt + 1))
-    done
-    if [ "$attempt" -eq "$COUNT" ]; then
-        msg "Failed to download $filename after $COUNT attempts."
+    filename=$(awk -v pkg="$engine_package" -v arch="$arch" -v ext="$pkg_ext" '
+        {
+            name=$2
+            sub(/^\*/, "", name)
+            sub(/^\.\//, "", name)
+            if (name ~ ("^" pkg "_.*_openwrt_" arch "\\." ext "$")) {
+                print name
+                exit
+            }
+        }
+    ' "$checksum_file")
+
+    if [ -z "$filename" ]; then
+        msg "The PodForCOP podkop-engine mirror has no $pkg_ext package for OpenWrt architecture $arch."
         exit 1
     fi
 
     expected_hash=$(awk -v filename="$filename" '{ name=$2; sub(/^\*/, "", name); sub(/^\.\//, "", name); if (name == filename) { print $1; exit } }' "$checksum_file")
+    filepath="$DOWNLOAD_DIR/$filename"
+
+    if ! download_asset "$filename" \
+        "https://github.com/19man91-ops/podforkop/releases/download/podkop-engine-current/$filename"; then
+        msg "Failed to download $filename."
+        exit 1
+    fi
+
     actual_hash=$(sha256sum "$filepath" | awk '{print $1}')
     if [ -z "$expected_hash" ] || [ "$actual_hash" != "$expected_hash" ]; then
         msg "Checksum verification failed for $filename."
@@ -411,52 +425,39 @@ install_sing_box_forkop() {
     }
 
     msg "Finding sing-box-forkop $variant package for $arch..."
-    release_data="$DOWNLOAD_DIR/sing-box-forkop-release.json"
-    if ! wget -q -O "$release_data" "$FORKOP_CORE_REPO"; then
-        msg "Could not read the sing-box-forkop package mirror from the PodForCOP repository."
-        exit 1
-    fi
-
-    asset=$(tr '{' '\n' < "$release_data" \
-        | sed -n "s|.*\"url\":\"\\([^\"]*/releases/assets/[0-9]*\\)\".*\"name\":\"\\(sing-box-forkop_[^\"]*_${variant}_${arch}\\.${pkg_ext}\\)\".*|\\1 \\2|p" \
-        | head -n 1)
-    if [ -z "$asset" ]; then
-        msg "The PodForCOP sing-box-forkop mirror has no $pkg_ext $variant package for OpenWrt architecture $arch."
-        exit 1
-    fi
-
-    checksum_url=$(tr '{' '\n' < "$release_data" \
-        | sed -n 's|.*"url":"\([^\"]*/releases/assets/[0-9]*\)".*"name":"SHA256SUMS".*|\1|p' \
-        | head -n 1)
-    if [ -z "$checksum_url" ]; then
-        msg "The sing-box-forkop mirror has no SHA256SUMS asset."
-        exit 1
-    fi
     checksum_file="$DOWNLOAD_DIR/sing-box-forkop-SHA256SUMS"
-    if ! wget -q --header="Accept: application/octet-stream" -O "$checksum_file" "$checksum_url" \
-        || [ ! -s "$checksum_file" ]; then
+    if ! download_asset "sing-box-forkop-SHA256SUMS" \
+        "https://github.com/19man91-ops/podforkop/releases/download/sing-box-forkop-current/SHA256SUMS"; then
         msg "Could not download sing-box-forkop checksums."
         exit 1
     fi
 
-    filename=${asset#* }
-    filepath="$DOWNLOAD_DIR/$filename"
-    attempt=0
-    while [ "$attempt" -lt "$COUNT" ]; do
-        msg "Downloading $filename (attempt $((attempt + 1)))..."
-        if wget -q --header="Accept: application/octet-stream" -O "$filepath" "${asset%% *}" \
-            && [ -s "$filepath" ]; then
-            break
-        fi
-        rm -f "$filepath"
-        attempt=$((attempt + 1))
-    done
-    if [ "$attempt" -eq "$COUNT" ]; then
-        msg "Failed to download $filename after $COUNT attempts."
+    filename=$(awk -v variant="$variant" -v arch="$arch" -v ext="$pkg_ext" '
+        {
+            name=$2
+            sub(/^\*/, "", name)
+            sub(/^\.\//, "", name)
+            if (name ~ ("sing-box-forkop_.*_" variant "_" arch "\\." ext "$")) {
+                print name
+                exit
+            }
+        }
+    ' "$checksum_file")
+
+    if [ -z "$filename" ]; then
+        msg "The PodForCOP sing-box-forkop mirror has no $pkg_ext $variant package for OpenWrt architecture $arch."
         exit 1
     fi
 
     expected_hash=$(awk -v filename="$filename" '{ name=$2; sub(/^\*/, "", name); sub(/^\.\//, "", name); if (name == filename) { print $1; exit } }' "$checksum_file")
+    filepath="$DOWNLOAD_DIR/$filename"
+
+    if ! download_asset "$filename" \
+        "https://github.com/19man91-ops/podforkop/releases/download/sing-box-forkop-current/$filename"; then
+        msg "Failed to download $filename."
+        exit 1
+    fi
+
     actual_hash=$(sha256sum "$filepath" | awk '{print $1}')
     if [ -z "$expected_hash" ] || [ "$actual_hash" != "$expected_hash" ]; then
         msg "Checksum verification failed for $filename."
