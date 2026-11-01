@@ -180,7 +180,7 @@ main() {
     version=$(wget -qO- "https://raw.githubusercontent.com/19man91-ops/podforkop/main/VERSION" 2>/dev/null | tr -d '\r\n')
     case "$version" in
         [0-9]*.[0-9]*.[0-9]*) ;;
-        *) version="0.8.6" ;;
+        *) version="0.8.7" ;;
     esac
 
     local pkg_ext
