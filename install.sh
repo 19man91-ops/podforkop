@@ -24,9 +24,18 @@ pkg_is_installed () {
         # grep -q should work without change based on example from documentation
         # apk list --installed --providers dnsmasq
         # <dnsmasq> dnsmasq-full-2.90-r3 x86_64 {feeds/base/package/network/services/dnsmasq} (GPL-2.0) [installed]
-        apk list --installed | grep -q "$pkg_name"
+        apk list --installed | awk -v package="$pkg_name" '
+            {
+                name = $1
+                sub(/^</, "", name)
+                sub(/>$/, "", name)
+                sub(/-[0-9].*$/, "", name)
+                if (name == package) found = 1
+            }
+            END { exit !found }
+        '
     else
-        opkg list-installed | grep -q "$pkg_name"
+        opkg list-installed | awk -v package="$pkg_name" '$1 == package { found = 1 } END { exit !found }'
     fi
 }
 
@@ -320,14 +329,14 @@ install_podkop_engine() {
     fi
 
     if [ "$PKG_IS_APK" -eq 0 ]; then
-        if [ -n "$installed_engine_package" ] && [ "$installed_engine_package" != "$engine_package" ]; then
-            msg "Switching from $installed_engine_package to $engine_package..."
+        if [ -n "$installed_engine_package" ]; then
+            msg "Replacing $installed_engine_package with $engine_package..."
             service podkop stop >/dev/null 2>&1 || true
             opkg remove --force-depends "$installed_engine_package" || {
                 msg "Could not remove the previous podkop-engine package."
                 exit 1
             }
-        elif [ -z "$installed_engine_package" ]; then
+        else
             msg "Replacing the OpenWrt sing-box package with $engine_package..."
             service podkop stop >/dev/null 2>&1 || true
             opkg remove --force-depends sing-box sing-box-tiny >/dev/null 2>&1 || true
@@ -347,6 +356,38 @@ install_podkop_engine() {
     fi
 }
 
+get_reclaimable_space_kb() {
+    local package installed_size reclaimable_space_kb
+
+    reclaimable_space_kb=0
+    for package in sing-box sing-box-tiny podkop-engine podkop-engine-full; do
+        if ! pkg_is_installed "$package"; then
+            continue
+        fi
+
+        if [ "$PKG_IS_APK" -eq 1 ]; then
+            installed_size=$(apk info -s "$package" 2>/dev/null \
+                | sed -n 's/.*installed size: *\([0-9.][0-9.]*\) *\([KM]iB\).*/\1 \2/p' \
+                | awk '$2 == "MiB" { printf "%.0f", $1 * 1024 } $2 == "KiB" { printf "%.0f", $1 }' \
+                | head -n 1)
+            case "$installed_size" in
+                ''|*[!0-9]*) continue ;;
+            esac
+            reclaimable_space_kb=$((reclaimable_space_kb + installed_size))
+        else
+            installed_size=$(opkg status "$package" 2>/dev/null \
+                | awk -F ': ' '$1 == "Installed-Size" { print $2; exit }')
+            case "$installed_size" in
+                ''|*[!0-9]*) continue ;;
+            esac
+            # opkg stores Installed-Size in bytes; df reports available KiB.
+            reclaimable_space_kb=$((reclaimable_space_kb + (installed_size + 1023) / 1024))
+        fi
+    done
+
+    printf '%s\n' "$reclaimable_space_kb"
+}
+
 check_system() {
     # Get router model
     MODEL=$(cat /tmp/sysinfo/model)
@@ -363,11 +404,16 @@ check_system() {
 
     # Check available space
     AVAILABLE_SPACE=$(df /overlay | awk 'NR==2 {print $4}')
-    REQUIRED_SPACE=25600 # 25MB in KB; includes the podkop-engine core
+    RECLAIMABLE_SPACE=$(get_reclaimable_space_kb)
+    EFFECTIVE_SPACE=$((AVAILABLE_SPACE + RECLAIMABLE_SPACE))
+    REQUIRED_SPACE=25600 # 25 MiB in KiB; includes the podkop-engine core
+    if [ "${PODFORCOP_ENGINE_VARIANT:-}" = "full" ] || pkg_is_installed "podkop-engine-full"; then
+        REQUIRED_SPACE=46080 # 45 MiB for the larger full engine build
+    fi
 
-    if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_SPACE" ]; then
+    if [ "$EFFECTIVE_SPACE" -lt "$REQUIRED_SPACE" ]; then
         msg "Error: Insufficient space in flash"
-        msg "Available: $((AVAILABLE_SPACE/1024))MB"
+        msg "Available now: $((AVAILABLE_SPACE/1024))MB; space reclaimed from the replaced sing-box package: $((RECLAIMABLE_SPACE/1024))MB"
         msg "Required: $((REQUIRED_SPACE/1024))MB"
         exit 1
     fi
