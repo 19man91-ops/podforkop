@@ -3,12 +3,13 @@ type HtmlTag = keyof HTMLElementTagNameMap;
 type HtmlElement<T extends HtmlTag> = HTMLElementTagNameMap[T];
 
 type HtmlAttributes<T extends HtmlTag = 'div'> = Partial<
-  Omit<HtmlElement<T>, 'style' | 'children'> & {
-    style?: string | Partial<CSSStyleDeclaration>;
-    class?: string;
-    onclick?: (event: MouseEvent) => void;
-  }
->;
+  Omit<HtmlElement<T>, 'style' | 'children'>
+> & {
+  style?: string | Partial<CSSStyleDeclaration>;
+  class?: string;
+  onclick?: (event: MouseEvent) => void;
+  [key: string]: unknown;
+};
 
 declare global {
   const fs: {
@@ -26,7 +27,7 @@ declare global {
   const E: <T extends HtmlTag>(
     type: T,
     attr?: HtmlAttributes<T> | null,
-    children?: (Node | string)[] | Node | string,
+    children?: (Node | string | null | undefined)[] | Node | string | null,
   ) => HTMLElementTagNameMap[T];
 
   const uci: {

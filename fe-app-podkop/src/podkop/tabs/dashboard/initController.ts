@@ -6,9 +6,15 @@ import {
 import { prettyBytes } from '../../../helpers/prettyBytes';
 import { CustomPodkopMethods, PodkopShellMethods } from '../../methods';
 import { logger, socket, store, StoreType } from '../../services';
-import { renderSections, renderWidget } from './partials';
+import { renderSections, renderSubscriptions, renderWidget } from './partials';
 import { fetchServicesInfo } from '../../fetchers';
 import { getClashApiSecret } from '../../methods/custom/getClashApiSecret';
+
+// Subscription info: refresh automatically when the cached data is older than
+// 30 minutes, but not more often than once per 10 minutes per page session.
+const SUBSCRIPTIONS_STALE_SECONDS = 30 * 60;
+const SUBSCRIPTIONS_AUTO_REFRESH_COOLDOWN_MS = 10 * 60 * 1000;
+let lastSubscriptionsAutoRefreshAt = 0;
 
 // Fetchers
 
@@ -36,6 +42,80 @@ async function fetchDashboardSections() {
       data,
     },
   });
+}
+
+async function fetchSubscriptionsInfo() {
+  const prev = store.get().subscriptionsWidget;
+
+  store.set({
+    subscriptionsWidget: {
+      ...prev,
+      loading: prev.data.length === 0,
+      failed: false,
+    },
+  });
+
+  const response = await PodkopShellMethods.getSubscriptionInfo();
+  const success = response.success;
+  const data = response.success ? response.data : null;
+
+  store.set({
+    subscriptionsWidget: {
+      loading: false,
+      failed: !success,
+      refreshing: false,
+      updatedAt: success ? (data?.updated_at ?? 0) : 0,
+      data: success ? (data?.sections ?? []) : [],
+    },
+  });
+
+  return success ? data : null;
+}
+
+async function handleRefreshSubscriptions() {
+  const prev = store.get().subscriptionsWidget;
+
+  if (prev.refreshing) {
+    return;
+  }
+
+  lastSubscriptionsAutoRefreshAt = Date.now();
+  store.set({
+    subscriptionsWidget: {
+      ...prev,
+      refreshing: true,
+    },
+  });
+
+  const { success } = await PodkopShellMethods.refreshSubscriptionInfo();
+
+  if (!success) {
+    logger.error('[DASHBOARD]', 'handleRefreshSubscriptions: refresh failed');
+  }
+
+  await fetchSubscriptionsInfo();
+}
+
+async function refreshSubscriptionsIfStale() {
+  const widget = store.get().subscriptionsWidget;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  if (widget.loading || widget.refreshing || widget.data.length === 0) {
+    return;
+  }
+
+  if (nowSeconds - widget.updatedAt < SUBSCRIPTIONS_STALE_SECONDS) {
+    return;
+  }
+
+  if (
+    Date.now() - lastSubscriptionsAutoRefreshAt <
+    SUBSCRIPTIONS_AUTO_REFRESH_COOLDOWN_MS
+  ) {
+    return;
+  }
+
+  await handleRefreshSubscriptions();
 }
 
 async function connectToClashSockets() {
@@ -215,6 +295,31 @@ async function renderSectionsWidget() {
   });
 }
 
+async function renderSubscriptionsWidget() {
+  logger.debug('[DASHBOARD]', 'renderSubscriptionsWidget');
+  const subscriptionsWidget = store.get().subscriptionsWidget;
+  const container = document.getElementById('dashboard-subscriptions');
+
+  if (!container) {
+    return;
+  }
+
+  const renderedWidget = renderSubscriptions({
+    loading: subscriptionsWidget.loading,
+    failed: subscriptionsWidget.failed,
+    refreshing: subscriptionsWidget.refreshing,
+    updatedAt: subscriptionsWidget.updatedAt,
+    data: subscriptionsWidget.data,
+    onRefresh: () => {
+      void handleRefreshSubscriptions();
+    },
+  });
+
+  return preserveScrollForPage(() => {
+    container.replaceChildren(renderedWidget);
+  });
+}
+
 async function renderBandwidthWidget() {
   logger.debug('[DASHBOARD]', 'renderBandwidthWidget');
   const traffic = store.get().bandwidthWidget;
@@ -376,6 +481,10 @@ async function onStoreUpdate(
     renderSectionsWidget();
   }
 
+  if (diff.subscriptionsWidget) {
+    renderSubscriptionsWidget();
+  }
+
   if (diff.bandwidthWidget) {
     renderBandwidthWidget();
   }
@@ -402,6 +511,8 @@ async function onPageMount() {
 
   // Initial sections fetch
   await fetchDashboardSections();
+  await fetchSubscriptionsInfo();
+  void refreshSubscriptionsIfStale();
   await fetchServicesInfo();
   await connectToClashSockets();
 }
@@ -416,6 +527,7 @@ function onPageUnmount() {
     'systemInfoWidget',
     'servicesInfoWidget',
     'sectionsWidget',
+    'subscriptionsWidget',
   ]);
   socket.resetAll();
 }

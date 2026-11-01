@@ -1279,3 +1279,160 @@ msgstr ""
 
 msgid "Bootstrap DNS Query Mode"
 msgstr ""
+
+msgid "Active"
+msgstr ""
+
+msgid "All devices"
+msgstr ""
+
+msgid "All routes"
+msgstr ""
+
+msgid "Auto refresh"
+msgstr ""
+
+msgid "Close all"
+msgstr ""
+
+msgid "Close all connections"
+msgstr ""
+
+msgid "Close connection"
+msgstr ""
+
+msgid "Close matching"
+msgstr ""
+
+msgid "Close the connections that match the filters"
+msgstr ""
+
+msgid "Closed"
+msgstr ""
+
+msgid "Connections are unavailable"
+msgstr ""
+
+msgid "d ago"
+msgstr ""
+
+msgid "Days left"
+msgstr ""
+
+msgid "Direct"
+msgstr ""
+
+msgid "Downloaded"
+msgstr ""
+
+msgid "Expired"
+msgstr ""
+
+msgid "Expires soon"
+msgstr ""
+
+msgid "Failed to close connection"
+msgstr ""
+
+msgid "Failed to close connections"
+msgstr ""
+
+msgid "h ago"
+msgstr ""
+
+msgid "Host"
+msgstr ""
+
+msgid "Invalid IPv6 address"
+msgstr ""
+
+msgid "Invalid path format. Path must start with "
+msgstr ""
+
+msgid "Invalid Shadowsocks URL: missing method and password separator "
+msgstr ""
+
+msgid "just now"
+msgstr ""
+
+msgid "Loading connections..."
+msgstr ""
+
+msgid "min ago"
+msgstr ""
+
+msgid "never"
+msgstr ""
+
+msgid "No active connections"
+msgstr ""
+
+msgid "No closed connections"
+msgstr ""
+
+msgid "No subscription data"
+msgstr ""
+
+msgid "No subscriptions configured in any section"
+msgstr ""
+
+msgid "not set"
+msgstr ""
+
+msgid "Paused while text is selected"
+msgstr ""
+
+msgid "Refresh"
+msgstr ""
+
+msgid "Refreshing..."
+msgstr ""
+
+msgid "Remaining"
+msgstr ""
+
+msgid "Route"
+msgstr ""
+
+msgid "Search"
+msgstr ""
+
+msgid "Some sources did not return subscription info"
+msgstr ""
+
+msgid "Source / Device"
+msgstr ""
+
+msgid "Sources"
+msgstr ""
+
+msgid "Subscriptions"
+msgstr ""
+
+msgid "Supported links: VLESS, Trojan, Shadowsocks, Hysteria2, VMess, TUIC, SOCKS, AnyTLS, NaiveProxy, and subscriptions"
+msgstr ""
+
+msgid "System"
+msgstr ""
+
+msgid "The router itself: its services and programs"
+msgstr ""
+
+msgid "Time"
+msgstr ""
+
+msgid "Type"
+msgstr ""
+
+msgid "Unlimited traffic"
+msgstr ""
+
+msgid "Updated"
+msgstr ""
+
+msgid "Uploaded"
+msgstr ""
+
+msgid "Valid until"
+msgstr ""
+

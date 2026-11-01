@@ -99,4 +99,18 @@ export const PodkopShellMethods = {
     ),
   getSingBoxFeatures: async () =>
     callBaseMethod<string[]>(Podkop.AvailableMethods.GET_SING_BOX_FEATURES),
+  getSubscriptionInfo: async () =>
+    callBaseMethod<Podkop.SubscriptionInfo>(
+      Podkop.AvailableMethods.SUBSCRIPTION_INFO,
+      [],
+      '/usr/bin/podkop',
+      20000,
+    ),
+  refreshSubscriptionInfo: async () =>
+    callBaseMethod<Podkop.SubscriptionInfo>(
+      Podkop.AvailableMethods.SUBSCRIPTION_INFO,
+      ['refresh'],
+      '/usr/bin/podkop',
+      60000,
+    ),
 };

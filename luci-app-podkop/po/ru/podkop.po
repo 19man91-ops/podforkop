@@ -937,3 +937,157 @@ msgstr "Укажите номер порта, на котором будет р�
 
 msgid "VPN"
 msgstr "VPN"
+
+msgid "Active"
+msgstr "Активные"
+
+msgid "All devices"
+msgstr "Все устройства"
+
+msgid "All routes"
+msgstr "Все маршруты"
+
+msgid "Auto refresh"
+msgstr "Автообновление"
+
+msgid "Close all"
+msgstr "Закрыть все"
+
+msgid "Close all connections"
+msgstr "Закрыть все соединения"
+
+msgid "Close connection"
+msgstr "Закрыть соединение"
+
+msgid "Close matching"
+msgstr "Закрыть подходящие"
+
+msgid "Close the connections that match the filters"
+msgstr "Закрыть соединения, соответствующие фильтрам"
+
+msgid "Closed"
+msgstr "Закрытые"
+
+msgid "Connections are unavailable"
+msgstr "Соединения недоступны"
+
+msgid "d ago"
+msgstr "дн назад"
+
+msgid "Days left"
+msgstr "Осталось дней"
+
+msgid "Direct"
+msgstr "Напрямую"
+
+msgid "Downloaded"
+msgstr "Скачано"
+
+msgid "Expired"
+msgstr "Истекла"
+
+msgid "Expires soon"
+msgstr "Скоро истекает"
+
+msgid "Failed to close connection"
+msgstr "Не удалось закрыть соединение"
+
+msgid "Failed to close connections"
+msgstr "Не удалось закрыть соединения"
+
+msgid "h ago"
+msgstr "ч назад"
+
+msgid "Host"
+msgstr "Хост"
+
+msgid "Invalid IPv6 address"
+msgstr "Неверный IPv6-адрес"
+
+msgid "Invalid path format. Path must start with "
+msgstr "Неверный формат пути. Путь должен начинаться с "
+
+msgid "Invalid Shadowsocks URL: missing method and password separator "
+msgstr "Неверный URL Shadowsocks: отсутствует разделитель метода и пароля "
+
+msgid "just now"
+msgstr "только что"
+
+msgid "Loading connections..."
+msgstr "Загрузка соединений..."
+
+msgid "min ago"
+msgstr "мин назад"
+
+msgid "never"
+msgstr "никогда"
+
+msgid "No active connections"
+msgstr "Нет активных соединений"
+
+msgid "No closed connections"
+msgstr "Нет закрытых соединений"
+
+msgid "No subscription data"
+msgstr "Нет данных о подписке"
+
+msgid "No subscriptions configured in any section"
+msgstr "Подписки не настроены ни в одной секции"
+
+msgid "not set"
+msgstr "не задан"
+
+msgid "Paused while text is selected"
+msgstr "Пауза, пока выделен текст"
+
+msgid "Refresh"
+msgstr "Обновить"
+
+msgid "Refreshing..."
+msgstr "Обновление..."
+
+msgid "Remaining"
+msgstr "Осталось"
+
+msgid "Route"
+msgstr "Маршрут"
+
+msgid "Search"
+msgstr "Поиск"
+
+msgid "Some sources did not return subscription info"
+msgstr "Часть источников не вернула данные о подписке"
+
+msgid "Sources"
+msgstr "Источники"
+
+msgid "Subscriptions"
+msgstr "Подписки"
+
+msgid "Supported links: VLESS, Trojan, Shadowsocks, Hysteria2, VMess, TUIC, SOCKS, AnyTLS, NaiveProxy, and subscriptions"
+msgstr "Поддерживаемые ссылки: VLESS, Trojan, Shadowsocks, Hysteria2, VMess, TUIC, SOCKS, AnyTLS, NaiveProxy и подписки"
+
+msgid "System"
+msgstr "Системные"
+
+msgid "The router itself: its services and programs"
+msgstr "Сам роутер: его службы и программы"
+
+msgid "Time"
+msgstr "Время"
+
+msgid "Type"
+msgstr "Тип"
+
+msgid "Unlimited traffic"
+msgstr "Без лимита трафика"
+
+msgid "Updated"
+msgstr "Обновлено"
+
+msgid "Uploaded"
+msgstr "Отправлено"
+
+msgid "Valid until"
+msgstr "Действует до"
+

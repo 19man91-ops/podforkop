@@ -1,6 +1,9 @@
 # Downloads and expands HTTP(S) proxy subscriptions for selector and URLTest sections.
 
 PODKOP_SUBSCRIPTION_CACHE_DIR="/etc/podkop/subscriptions"
+PODKOP_SUBSCRIPTION_INFO_CACHE="${PODKOP_SUBSCRIPTION_CACHE_DIR}/info.json"
+# Seconds to wait for a subscription server when collecting subscription-userinfo
+PODKOP_SUBSCRIPTION_INFO_TIMEOUT="${PODKOP_SUBSCRIPTION_INFO_TIMEOUT:-10}"
 
 _subscription_cache_file() {
     local section="$1"
@@ -352,6 +355,208 @@ subscription_cached_links() {
     [ "$old_noglob" = "1" ] || set +f
 }
 
+#######################################
+# Collect subscription traffic/expiry information from the standard
+# "subscription-userinfo" HTTP header (Marzban, 3X-UI, Remnawave, V2board,
+# X-UI, Mihomo and other panels).
+#
+# Result is cached in $PODKOP_SUBSCRIPTION_INFO_CACHE and read by the LuCI
+# Dashboard ("Subscriptions" cards). Only the host name of a subscription is
+# stored, never the full URL (it usually contains a secret token).
+#######################################
+
+_SUBSCRIPTION_INFO_URLS=""
+_subscription_info_collect_url() {
+    [ -n "$1" ] && _SUBSCRIPTION_INFO_URLS="${_SUBSCRIPTION_INFO_URLS:+$_SUBSCRIPTION_INFO_URLS }$1"
+}
+
+_subscription_section_urls() {
+    local section="$1" option
+
+    _SUBSCRIPTION_INFO_URLS=""
+    for option in subscription_urls selector_subscription_urls urltest_subscription_urls; do
+        config_list_foreach "$section" "$option" _subscription_info_collect_url
+    done
+    printf '%s' "$_SUBSCRIPTION_INFO_URLS"
+}
+
+_subscription_info_number() {
+    case "$1" in
+    '' | *[!0-9]*) printf '0' ;;
+    *) printf '%s' "$1" ;;
+    esac
+}
+
+_subscription_info_header_value() {
+    printf '%s' "$2" | tr ';' '\n' | awk -F= -v key="$1" '
+        {
+            name = tolower($1)
+            gsub(/^[[:space:]]+/, "", name)
+            gsub(/[[:space:]]+$/, "", name)
+            if (name == key) {
+                value = $2
+                gsub(/[^0-9]/, "", value)
+                print value
+                exit
+            }
+        }'
+}
+
+_subscription_info_parse_headers() {
+    local headers_file="$1"
+    local header
+
+    SUB_INFO_HEADER=""
+    SUB_INFO_UPLOAD="0"
+    SUB_INFO_DOWNLOAD="0"
+    SUB_INFO_TOTAL="0"
+    SUB_INFO_EXPIRE="0"
+
+    header=$(grep -i 'subscription-userinfo:' "$headers_file" 2>/dev/null | tail -n 1 | sed 's/^[^:]*://' | tr -d '\r')
+    [ -n "$header" ] || return 0
+
+    SUB_INFO_HEADER="$header"
+    SUB_INFO_UPLOAD=$(_subscription_info_number "$(_subscription_info_header_value upload "$header")")
+    SUB_INFO_DOWNLOAD=$(_subscription_info_number "$(_subscription_info_header_value download "$header")")
+    SUB_INFO_TOTAL=$(_subscription_info_number "$(_subscription_info_header_value total "$header")")
+    SUB_INFO_EXPIRE=$(_subscription_info_number "$(_subscription_info_header_value expire "$header")")
+}
+
+_subscription_info_fetch() {
+    local url="$1"
+    local headers_file
+
+    SUB_INFO_STATUS="error"
+    SUB_INFO_LABEL=""
+    SUB_INFO_UPLOAD="0"
+    SUB_INFO_DOWNLOAD="0"
+    SUB_INFO_TOTAL="0"
+    SUB_INFO_EXPIRE="0"
+
+    case "$url" in
+    http://* | https://*)
+        SUB_INFO_LABEL=$(url_get_host "$url")
+        [ -n "$SUB_INFO_LABEL" ] || SUB_INFO_LABEL="subscription"
+        headers_file=$(mktemp)
+
+        if command -v curl >/dev/null 2>&1; then
+            if curl -sS -L --max-time "$PODKOP_SUBSCRIPTION_INFO_TIMEOUT" \
+                -A "podkop-subscription-info/1.0" \
+                -D "$headers_file" -o /dev/null "$url" >/dev/null 2>&1; then
+                _subscription_info_parse_headers "$headers_file"
+                [ -n "$SUB_INFO_HEADER" ] && SUB_INFO_STATUS="ok"
+            fi
+        elif command -v wget >/dev/null 2>&1; then
+            if wget -q -S -O /dev/null --timeout="$PODKOP_SUBSCRIPTION_INFO_TIMEOUT" \
+                "$url" 2>"$headers_file"; then
+                _subscription_info_parse_headers "$headers_file"
+                [ -n "$SUB_INFO_HEADER" ] && SUB_INFO_STATUS="ok"
+            fi
+        fi
+
+        rm -f "$headers_file"
+        ;;
+    /*)
+        SUB_INFO_LABEL=$(basename "$url")
+        SUB_INFO_STATUS="local-file"
+        ;;
+    *)
+        SUB_INFO_LABEL="subscription"
+        SUB_INFO_STATUS="unsupported"
+        ;;
+    esac
+}
+
+_subscription_info_source_json() {
+    jq -nc \
+        --arg label "$SUB_INFO_LABEL" \
+        --arg status "$SUB_INFO_STATUS" \
+        --argjson upload "$SUB_INFO_UPLOAD" \
+        --argjson download "$SUB_INFO_DOWNLOAD" \
+        --argjson total "$SUB_INFO_TOTAL" \
+        --argjson expire "$SUB_INFO_EXPIRE" \
+        '{label: $label, status: $status, upload: $upload, download: $download, total: $total, expire: $expire}'
+}
+
+_subscription_info_section() {
+    local section="$1"
+    local urls url sources_file section_json now
+
+    section_is_enabled "$section" || return 0
+
+    urls=$(_subscription_section_urls "$section")
+    [ -n "$urls" ] || return 0
+
+    now=$(date +%s)
+    sources_file=$(mktemp)
+
+    for url in $urls; do
+        _subscription_info_fetch "$url"
+        _subscription_info_source_json >> "$sources_file"
+    done
+
+    section_json=$(jq -sc \
+        --arg section "$section" \
+        --argjson updated "$now" \
+        '
+        [ .[] | select(.status == "ok") ] as $ok
+        | {
+            section: $section,
+            updated_at: $updated,
+            upload: ([ $ok[] | .upload ] | add // 0),
+            download: ([ $ok[] | .download ] | add // 0),
+            total: ([ $ok[] | .total ] | add // 0),
+            expire: ([ $ok[] | select(.expire > 0) | .expire ] | min // 0),
+            status: (
+                if ($ok | length) == 0 then "no-data"
+                elif ($ok | length) == (length) then "ok"
+                else "partial"
+                end
+            ),
+            sources: .
+        }' "$sources_file")
+
+    printf '%s\n' "$section_json" >> "$PODKOP_SUBSCRIPTION_INFO_SECTIONS_FILE"
+    rm -f "$sources_file"
+}
+
+subscription_info_refresh() {
+    local sections_file cache_tmp now
+
+    mkdir -p "$PODKOP_SUBSCRIPTION_CACHE_DIR"
+    sections_file=$(mktemp)
+    PODKOP_SUBSCRIPTION_INFO_SECTIONS_FILE="$sections_file"
+    now=$(date +%s)
+
+    config_foreach _subscription_info_section "section"
+
+    cache_tmp=$(mktemp)
+    if [ -s "$sections_file" ]; then
+        jq -s --argjson updated "$now" '{updated_at: $updated, sections: .}' "$sections_file" > "$cache_tmp"
+    else
+        jq -n --argjson updated "$now" '{updated_at: $updated, sections: []}' > "$cache_tmp"
+    fi
+    mv "$cache_tmp" "$PODKOP_SUBSCRIPTION_INFO_CACHE"
+    chmod 600 "$PODKOP_SUBSCRIPTION_INFO_CACHE" 2>/dev/null || true
+    rm -f "$sections_file"
+}
+
+# Prints the cached subscription info; "refresh" as the first argument
+# downloads fresh data before printing.
+subscription_info_show() {
+    local refresh="${1:-}"
+
+    if [ "$refresh" = "refresh" ]; then
+        subscription_info_refresh >/dev/null 2>&1 || true
+    fi
+
+    if [ -r "$PODKOP_SUBSCRIPTION_INFO_CACHE" ] && jq -e . "$PODKOP_SUBSCRIPTION_INFO_CACHE" >/dev/null 2>&1; then
+        cat "$PODKOP_SUBSCRIPTION_INFO_CACHE"
+    else
+        jq -n '{updated_at: 0, sections: []}'
+    fi
+}
+
 subscription_update() {
     if sing_box_uses_subscription_providers; then
         log "Updating proxy subscriptions via sing-box-forkop..."
@@ -361,6 +566,7 @@ subscription_update() {
         fi
         if /usr/bin/podkop clash_api update_provider >/dev/null 2>&1 || /etc/init.d/sing-box reload 2>/dev/null; then
             log "Proxy subscriptions updated successfully"
+            subscription_info_refresh >/dev/null 2>&1 || true
             return 0
         else
             log "Failed to update proxy subscriptions via Clash API / reload" "warn"
@@ -368,6 +574,7 @@ subscription_update() {
         fi
     fi
     subscription_refresh_all
+    subscription_info_refresh >/dev/null 2>&1 || true
     if [ "$PODKOP_SUBSCRIPTIONS_FAILED" = "1" ]; then
         log "One or more proxy subscriptions could not be updated; cached data was left unchanged" "warn"
         return 1

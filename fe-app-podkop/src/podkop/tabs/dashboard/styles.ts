@@ -134,4 +134,135 @@ export const styles = `
     color: var(--error-color-medium, red);
 }
 
+/* Subscription traffic/expiry cards */
+.pdk_dashboard-page__subscriptions {
+    margin-top: 10px;
+}
+
+.pdk_dashboard-page__subscriptions__title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.pdk_dashboard-page__subscriptions__title-updated {
+    font-size: 0.85em;
+}
+
+.pdk_dashboard-page__subscriptions__grid {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(var(--dashboard-grid-columns), 1fr);
+    grid-gap: 10px;
+}
+
+.pdk_dashboard-page__subscriptions__card {
+    border: 2px var(--background-color-low, lightgray) solid;
+    border-radius: 4px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pdk_dashboard-page__subscriptions__card--warning {
+    border-color: var(--warn-color-medium, orange);
+}
+
+.pdk_dashboard-page__subscriptions__card--skeleton {
+    height: 160px;
+}
+
+.pdk_dashboard-page__subscriptions__card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.pdk_dashboard-page__subscriptions__card-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pdk_dashboard-page__subscriptions__card-spacer {
+    min-height: 12px;
+}
+
+.pdk_dashboard-page__subscriptions__row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    line-height: 1.5;
+}
+
+.pdk_dashboard-page__subscriptions__row--muted {
+    color: var(--text-color-low, gray);
+    font-size: 0.9em;
+}
+
+.pdk_dashboard-page__subscriptions__row--error {
+    color: var(--error-color-medium, red);
+}
+
+.pdk_dashboard-page__subscriptions__row__key {
+    font-weight: 600;
+}
+
+.pdk_dashboard-page__subscriptions__bar {
+    height: 10px;
+    width: 100%;
+    border-radius: 6px;
+    background: var(--background-color-low, #e5e5e5);
+    overflow: hidden;
+}
+
+.pdk_dashboard-page__subscriptions__bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.3s ease;
+}
+
+.pdk_dashboard-page__subscriptions__bar-fill--green {
+    background: var(--success-color-medium, green);
+}
+
+.pdk_dashboard-page__subscriptions__bar-fill--yellow {
+    background: var(--warn-color-medium, orange);
+}
+
+.pdk_dashboard-page__subscriptions__bar-fill--red {
+    background: var(--error-color-medium, red);
+}
+
+.pdk_dashboard-page__subscriptions__badge {
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.pdk_dashboard-page__subscriptions__badge--yellow {
+    color: var(--warn-color-medium, orange);
+    border: 1px solid var(--warn-color-medium, orange);
+}
+
+.pdk_dashboard-page__subscriptions__badge--red {
+    color: var(--error-color-medium, red);
+    border: 1px solid var(--error-color-medium, red);
+}
+
+.pdk_dashboard-page__subscriptions__refresh {
+    white-space: nowrap;
+}
+
+.pdk_dashboard-page__subscriptions__updated {
+    margin-top: auto;
+}
+
 `;
+
+export default styles;

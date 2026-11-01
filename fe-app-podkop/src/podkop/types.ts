@@ -64,6 +64,7 @@ export namespace Podkop {
     CHECK_LOGS = 'check_logs',
     GET_SYSTEM_INFO = 'get_system_info',
     GET_SING_BOX_FEATURES = 'get_sing_box_features',
+    SUBSCRIPTION_INFO = 'subscription_info',
   }
 
   export enum AvailableClashAPIMethods {
@@ -112,6 +113,40 @@ export namespace Podkop {
     code: string;
     displayName: string;
     outbounds: Outbound[];
+  }
+
+  export type SubscriptionSourceStatus =
+    | 'ok'
+    | 'error'
+    | 'local-file'
+    | 'unsupported';
+
+  export type SubscriptionSectionStatus = 'ok' | 'partial' | 'no-data';
+
+  export interface SubscriptionSourceInfo {
+    // Host name of the subscription URL or the local file name (no secrets)
+    label: string;
+    status: SubscriptionSourceStatus;
+    upload: number;
+    download: number;
+    total: number;
+    expire: number;
+  }
+
+  export interface SubscriptionSectionInfo {
+    section: string;
+    updated_at: number;
+    upload: number;
+    download: number;
+    total: number;
+    expire: number;
+    status: SubscriptionSectionStatus;
+    sources: SubscriptionSourceInfo[];
+  }
+
+  export interface SubscriptionInfo {
+    updated_at: number;
+    sections: SubscriptionSectionInfo[];
   }
 
   export interface ConfigProxyUrlTestSection {

@@ -3026,6 +3026,7 @@ Available commands:
     disable                 Disable podkop autostart
     list_update             Update domain lists
     subscription_update     Update proxy subscriptions
+    subscription_info       Show subscription traffic/expiry info in JSON format
     check_proxy             Check proxy connectivity
     check_nft               Check NFT rules
     check_nft_rules         Check NFT rules status
@@ -3072,6 +3073,9 @@ list_update)
     ;;
 subscription_update)
     subscription_update
+    ;;
+subscription_info)
+    subscription_info_show "${2:-}"
     ;;
 check_proxy)
     check_proxy

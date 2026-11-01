@@ -648,11 +648,11 @@ async function getConfigSections() {
 }
 
 // src/podkop/methods/shell/callBaseMethod.ts
-async function callBaseMethod(method, args = [], command = "/usr/bin/podkop") {
+async function callBaseMethod(method, args = [], command = "/usr/bin/podkop", timeout = 15e3) {
   const response = await executeShellCommand({
     command,
     args: [method, ...args],
-    timeout: 15e3
+    timeout
   });
   if (response.stdout) {
     try {
@@ -695,6 +695,7 @@ var Podkop;
     AvailableMethods2["CHECK_LOGS"] = "check_logs";
     AvailableMethods2["GET_SYSTEM_INFO"] = "get_system_info";
     AvailableMethods2["GET_SING_BOX_FEATURES"] = "get_sing_box_features";
+    AvailableMethods2["SUBSCRIPTION_INFO"] = "subscription_info";
   })(AvailableMethods = Podkop2.AvailableMethods || (Podkop2.AvailableMethods = {}));
   let AvailableClashAPIMethods;
   ((AvailableClashAPIMethods2) => {
@@ -783,7 +784,19 @@ var PodkopShellMethods = {
   getSystemInfo: async () => callBaseMethod(
     Podkop.AvailableMethods.GET_SYSTEM_INFO
   ),
-  getSingBoxFeatures: async () => callBaseMethod(Podkop.AvailableMethods.GET_SING_BOX_FEATURES)
+  getSingBoxFeatures: async () => callBaseMethod(Podkop.AvailableMethods.GET_SING_BOX_FEATURES),
+  getSubscriptionInfo: async () => callBaseMethod(
+    Podkop.AvailableMethods.SUBSCRIPTION_INFO,
+    [],
+    "/usr/bin/podkop",
+    2e4
+  ),
+  refreshSubscriptionInfo: async () => callBaseMethod(
+    Podkop.AvailableMethods.SUBSCRIPTION_INFO,
+    ["refresh"],
+    "/usr/bin/podkop",
+    6e4
+  )
 };
 
 // src/podkop/methods/custom/getDashboardSections.ts
@@ -1677,6 +1690,13 @@ var initialStore = {
     latencyFetching: false,
     data: []
   },
+  subscriptionsWidget: {
+    loading: true,
+    failed: false,
+    refreshing: false,
+    updatedAt: 0,
+    data: []
+  },
   ...initialDiagnosticStore
 };
 var store = new StoreService(initialStore);
@@ -2565,6 +2585,336 @@ function renderSections(props) {
   return renderDefaultState(props);
 }
 
+// src/helpers/prettyBytes.ts
+function prettyBytes(n) {
+  const UNITS = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+  if (n < 1e3) {
+    return n + " B";
+  }
+  const exponent = Math.min(Math.floor(Math.log10(n) / 3), UNITS.length - 1);
+  n = Number((n / Math.pow(1e3, exponent)).toPrecision(3));
+  const unit = UNITS[exponent];
+  return n + " " + unit;
+}
+
+// src/podkop/tabs/dashboard/subscriptionUtils.ts
+var SAFE_ZERO = 0;
+function toNonNegativeNumber(value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return SAFE_ZERO;
+  }
+  return value;
+}
+function getTrafficUsage(upload, download, total) {
+  const safeUpload = toNonNegativeNumber(upload);
+  const safeDownload = toNonNegativeNumber(download);
+  const safeTotal = toNonNegativeNumber(total);
+  const used = safeUpload + safeDownload;
+  if (safeTotal === 0) {
+    return {
+      used,
+      total: 0,
+      remaining: 0,
+      percent: 0,
+      level: "ok",
+      unlimited: true
+    };
+  }
+  const percent = Math.min(100, Math.round(used / safeTotal * 100));
+  const level = percent >= 90 ? "critical" : percent >= 70 ? "warning" : "ok";
+  return {
+    used,
+    total: safeTotal,
+    remaining: Math.max(0, safeTotal - used),
+    percent,
+    level,
+    unlimited: false
+  };
+}
+var SECONDS_PER_DAY = 86400;
+var EXPIRY_WARNING_DAYS = 3;
+function getExpiryInfo(expire, nowSeconds = Math.floor(Date.now() / 1e3)) {
+  if (!Number.isFinite(expire) || expire <= 0) {
+    return { validUntil: null, daysLeft: null, level: "none" };
+  }
+  const daysLeft = Math.ceil((expire - nowSeconds) / SECONDS_PER_DAY);
+  const level = daysLeft < 0 ? "expired" : daysLeft <= EXPIRY_WARNING_DAYS ? "warning" : "ok";
+  return {
+    validUntil: new Date(expire * 1e3),
+    daysLeft,
+    level
+  };
+}
+function formatUpdatedAgo(updatedAt, nowSeconds = Math.floor(Date.now() / 1e3)) {
+  if (!Number.isFinite(updatedAt) || updatedAt <= 0) {
+    return _("never");
+  }
+  const diff = Math.max(0, nowSeconds - updatedAt);
+  if (diff < 60) {
+    return _("just now");
+  }
+  if (diff < 3600) {
+    return `${Math.floor(diff / 60)} ${_("min ago")}`;
+  }
+  if (diff < SECONDS_PER_DAY) {
+    return `${Math.floor(diff / 3600)} ${_("h ago")}`;
+  }
+  return `${Math.floor(diff / SECONDS_PER_DAY)} ${_("d ago")}`;
+}
+
+// src/podkop/tabs/dashboard/partials/renderSubscriptions.ts
+function formatDate(date) {
+  try {
+    return date.toLocaleDateString();
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
+}
+function renderSkeleton() {
+  return E("div", { class: "pdk_dashboard-page__subscriptions" }, [
+    E("div", { class: "pdk_dashboard-page__subscriptions__title" }, [
+      E("b", {}, _("Subscriptions"))
+    ]),
+    E("div", { class: "pdk_dashboard-page__subscriptions__grid" }, [
+      E("div", {
+        class: "pdk_dashboard-page__subscriptions__card pdk_dashboard-page__subscriptions__card--skeleton skeleton"
+      })
+    ])
+  ]);
+}
+function renderRefreshButton(refreshing, onRefresh, extraClass = "") {
+  return E(
+    "button",
+    {
+      class: `btn pdk_dashboard-page__subscriptions__refresh ${extraClass}`,
+      disabled: refreshing ? true : void 0,
+      click: () => {
+        if (!refreshing) {
+          onRefresh();
+        }
+      }
+    },
+    refreshing ? _("Refreshing...") : _("Refresh")
+  );
+}
+function renderTrafficBlock(info) {
+  const usage = getTrafficUsage(info.upload, info.download, info.total);
+  if (usage.unlimited) {
+    return E("div", { class: "pdk_dashboard-page__subscriptions__row" }, [
+      E("span", { class: "pdk_dashboard-page__subscriptions__row__key" }, [
+        `${_("Traffic")}: `
+      ]),
+      E("span", {}, [
+        usage.used > 0 ? `${prettyBytes(usage.used)} (${_("Unlimited traffic")})` : _("Unlimited traffic")
+      ])
+    ]);
+  }
+  const levelClass = usage.level === "critical" ? "pdk_dashboard-page__subscriptions__bar-fill--red" : usage.level === "warning" ? "pdk_dashboard-page__subscriptions__bar-fill--yellow" : "pdk_dashboard-page__subscriptions__bar-fill--green";
+  return E("div", { class: "pdk_dashboard-page__subscriptions__traffic" }, [
+    E(
+      "div",
+      {
+        class: "pdk_dashboard-page__subscriptions__row",
+        title: `${_("Traffic")}: ${usage.percent}%`
+      },
+      [
+        E("span", { class: "pdk_dashboard-page__subscriptions__row__key" }, [
+          `${_("Traffic")}: `
+        ]),
+        E("span", {}, [
+          `${prettyBytes(usage.used)} / ${prettyBytes(usage.total)}`
+        ])
+      ]
+    ),
+    E(
+      "div",
+      {
+        class: "pdk_dashboard-page__subscriptions__bar",
+        role: "progressbar",
+        "aria-valuemin": "0",
+        "aria-valuemax": "100",
+        "aria-valuenow": String(usage.percent),
+        title: `${_("Remaining")}: ${prettyBytes(usage.remaining)}`
+      },
+      [
+        E("div", {
+          class: `pdk_dashboard-page__subscriptions__bar-fill ${levelClass}`,
+          style: `width: ${usage.percent}%`
+        })
+      ]
+    ),
+    E(
+      "div",
+      {
+        class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
+      },
+      [
+        E("span", {}, [
+          `${_("Remaining")}: ${prettyBytes(usage.remaining)} (${usage.percent}%)`
+        ])
+      ]
+    )
+  ]);
+}
+function renderExpiryBlock(info) {
+  const expiry = getExpiryInfo(info.expire);
+  if (!expiry.validUntil) {
+    return E(
+      "div",
+      {
+        class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
+      },
+      [`${_("Valid until")}: ${_("not set")}`]
+    );
+  }
+  const children = [
+    E("span", { class: "pdk_dashboard-page__subscriptions__row__key" }, [
+      `${_("Valid until")}: `
+    ]),
+    E("span", {}, [`${formatDate(expiry.validUntil)}`]),
+    E("span", { class: "pdk_dashboard-page__subscriptions__row--muted" }, [
+      ` (${_("Days left")}: ${Math.max(0, expiry.daysLeft ?? 0)})`
+    ])
+  ];
+  if (expiry.level === "expired") {
+    children.push(
+      E(
+        "span",
+        {
+          class: "pdk_dashboard-page__subscriptions__badge pdk_dashboard-page__subscriptions__badge--red"
+        },
+        `\u26A0\uFE0F ${_("Expired")}`
+      )
+    );
+  } else if (expiry.level === "warning") {
+    children.push(
+      E(
+        "span",
+        {
+          class: "pdk_dashboard-page__subscriptions__badge pdk_dashboard-page__subscriptions__badge--yellow"
+        },
+        `\u26A0\uFE0F ${_("Expires soon")}`
+      )
+    );
+  }
+  return E(
+    "div",
+    { class: "pdk_dashboard-page__subscriptions__row" },
+    children
+  );
+}
+function renderCard(info, refreshing, onRefresh) {
+  const sources = Array.from(
+    new Set(info.sources.map((source) => source.label).filter(Boolean))
+  );
+  const hasData = info.status !== "no-data";
+  const partial = info.status === "partial";
+  return E(
+    "div",
+    {
+      class: `pdk_dashboard-page__subscriptions__card${partial ? " pdk_dashboard-page__subscriptions__card--warning" : ""}`
+    },
+    [
+      E("div", { class: "pdk_dashboard-page__subscriptions__card-header" }, [
+        E("b", { class: "pdk_dashboard-page__subscriptions__card-title" }, [
+          info.section
+        ]),
+        renderRefreshButton(refreshing, onRefresh)
+      ]),
+      E(
+        "div",
+        {
+          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
+        },
+        [
+          `${_("Sources")}: ${sources.length ? sources.join(", ") : _("unknown")}${sources.length > 1 ? ` (+${sources.length - 1})` : ""}`
+        ]
+      ),
+      hasData ? renderTrafficBlock(info) : E(
+        "div",
+        {
+          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
+        },
+        [_("No subscription data")]
+      ),
+      hasData ? renderExpiryBlock(info) : E("div", { class: "pdk_dashboard-page__subscriptions__card-spacer" }),
+      partial ? E(
+        "div",
+        {
+          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
+        },
+        [_("Some sources did not return subscription info")]
+      ) : null,
+      E(
+        "div",
+        {
+          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted pdk_dashboard-page__subscriptions__updated"
+        },
+        [`${_("Updated")}: ${formatUpdatedAgo(info.updated_at)}`]
+      )
+    ]
+  );
+}
+function renderSubscriptions({
+  loading: loading2,
+  failed: failed2,
+  refreshing,
+  updatedAt,
+  data,
+  onRefresh
+}) {
+  if (loading2) {
+    return renderSkeleton();
+  }
+  const header = E(
+    "div",
+    { class: "pdk_dashboard-page__subscriptions__title" },
+    [
+      E("b", {}, _("Subscriptions")),
+      E(
+        "span",
+        {
+          class: "pdk_dashboard-page__subscriptions__title-updated pdk_dashboard-page__subscriptions__row--muted"
+        },
+        [`${_("Updated")}: ${formatUpdatedAgo(updatedAt)}`]
+      ),
+      renderRefreshButton(refreshing, onRefresh)
+    ]
+  );
+  if (failed2) {
+    return E("div", { class: "pdk_dashboard-page__subscriptions" }, [
+      header,
+      E(
+        "div",
+        {
+          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--error"
+        },
+        [_("Currently unavailable")]
+      )
+    ]);
+  }
+  if (data.length === 0) {
+    return E("div", { class: "pdk_dashboard-page__subscriptions" }, [
+      header,
+      E(
+        "div",
+        {
+          class: "pdk_dashboard-page__subscriptions__row pdk_dashboard-page__subscriptions__row--muted"
+        },
+        [_("No subscriptions configured in any section")]
+      )
+    ]);
+  }
+  return E("div", { class: "pdk_dashboard-page__subscriptions" }, [
+    header,
+    E(
+      "div",
+      { class: "pdk_dashboard-page__subscriptions__grid" },
+      data.map((info) => renderCard(info, refreshing, onRefresh))
+    )
+  ]);
+}
+
 // src/podkop/tabs/dashboard/partials/renderWidget.ts
 function renderFailedState2() {
   return E(
@@ -2659,6 +3009,20 @@ function render() {
           renderWidget({ loading: true, failed: false, title: "", items: [] })
         )
       ]),
+      // Subscription traffic/expiry cards
+      E(
+        "div",
+        { id: "dashboard-subscriptions" },
+        renderSubscriptions({
+          loading: true,
+          failed: false,
+          refreshing: false,
+          updatedAt: 0,
+          data: [],
+          onRefresh: () => {
+          }
+        })
+      ),
       // All outbounds
       E(
         "div",
@@ -2681,18 +3045,6 @@ function render() {
       )
     ]
   );
-}
-
-// src/helpers/prettyBytes.ts
-function prettyBytes(n) {
-  const UNITS = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
-  if (n < 1e3) {
-    return n + " B";
-  }
-  const exponent = Math.min(Math.floor(Math.log10(n) / 3), UNITS.length - 1);
-  n = Number((n / Math.pow(1e3, exponent)).toPrecision(3));
-  const unit = UNITS[exponent];
-  return n + " " + unit;
 }
 
 // src/podkop/fetchers/fetchServicesInfo.ts
@@ -2722,6 +3074,9 @@ async function fetchServicesInfo() {
 }
 
 // src/podkop/tabs/dashboard/initController.ts
+var SUBSCRIPTIONS_STALE_SECONDS = 30 * 60;
+var SUBSCRIPTIONS_AUTO_REFRESH_COOLDOWN_MS = 10 * 60 * 1e3;
+var lastSubscriptionsAutoRefreshAt = 0;
 async function fetchDashboardSections() {
   const prev = store.get().sectionsWidget;
   store.set({
@@ -2742,6 +3097,61 @@ async function fetchDashboardSections() {
       data
     }
   });
+}
+async function fetchSubscriptionsInfo() {
+  const prev = store.get().subscriptionsWidget;
+  store.set({
+    subscriptionsWidget: {
+      ...prev,
+      loading: prev.data.length === 0,
+      failed: false
+    }
+  });
+  const response = await PodkopShellMethods.getSubscriptionInfo();
+  const success = response.success;
+  const data = response.success ? response.data : null;
+  store.set({
+    subscriptionsWidget: {
+      loading: false,
+      failed: !success,
+      refreshing: false,
+      updatedAt: success ? data?.updated_at ?? 0 : 0,
+      data: success ? data?.sections ?? [] : []
+    }
+  });
+  return success ? data : null;
+}
+async function handleRefreshSubscriptions() {
+  const prev = store.get().subscriptionsWidget;
+  if (prev.refreshing) {
+    return;
+  }
+  lastSubscriptionsAutoRefreshAt = Date.now();
+  store.set({
+    subscriptionsWidget: {
+      ...prev,
+      refreshing: true
+    }
+  });
+  const { success } = await PodkopShellMethods.refreshSubscriptionInfo();
+  if (!success) {
+    logger.error("[DASHBOARD]", "handleRefreshSubscriptions: refresh failed");
+  }
+  await fetchSubscriptionsInfo();
+}
+async function refreshSubscriptionsIfStale() {
+  const widget = store.get().subscriptionsWidget;
+  const nowSeconds = Math.floor(Date.now() / 1e3);
+  if (widget.loading || widget.refreshing || widget.data.length === 0) {
+    return;
+  }
+  if (nowSeconds - widget.updatedAt < SUBSCRIPTIONS_STALE_SECONDS) {
+    return;
+  }
+  if (Date.now() - lastSubscriptionsAutoRefreshAt < SUBSCRIPTIONS_AUTO_REFRESH_COOLDOWN_MS) {
+    return;
+  }
+  await handleRefreshSubscriptions();
 }
 async function connectToClashSockets() {
   const clashApiSecret = await getClashApiSecret();
@@ -2900,6 +3310,27 @@ async function renderSectionsWidget() {
     container.replaceChildren(...renderedWidgets);
   });
 }
+async function renderSubscriptionsWidget() {
+  logger.debug("[DASHBOARD]", "renderSubscriptionsWidget");
+  const subscriptionsWidget = store.get().subscriptionsWidget;
+  const container = document.getElementById("dashboard-subscriptions");
+  if (!container) {
+    return;
+  }
+  const renderedWidget = renderSubscriptions({
+    loading: subscriptionsWidget.loading,
+    failed: subscriptionsWidget.failed,
+    refreshing: subscriptionsWidget.refreshing,
+    updatedAt: subscriptionsWidget.updatedAt,
+    data: subscriptionsWidget.data,
+    onRefresh: () => {
+      void handleRefreshSubscriptions();
+    }
+  });
+  return preserveScrollForPage(() => {
+    container.replaceChildren(renderedWidget);
+  });
+}
 async function renderBandwidthWidget() {
   logger.debug("[DASHBOARD]", "renderBandwidthWidget");
   const traffic = store.get().bandwidthWidget;
@@ -3024,6 +3455,9 @@ async function onStoreUpdate(next, prev, diff) {
   if (diff.sectionsWidget) {
     renderSectionsWidget();
   }
+  if (diff.subscriptionsWidget) {
+    renderSubscriptionsWidget();
+  }
   if (diff.bandwidthWidget) {
     renderBandwidthWidget();
   }
@@ -3041,6 +3475,8 @@ async function onPageMount() {
   onPageUnmount();
   store.subscribe(onStoreUpdate);
   await fetchDashboardSections();
+  await fetchSubscriptionsInfo();
+  void refreshSubscriptionsIfStale();
   await fetchServicesInfo();
   await connectToClashSockets();
 }
@@ -3051,7 +3487,8 @@ function onPageUnmount() {
     "trafficTotalWidget",
     "systemInfoWidget",
     "servicesInfoWidget",
-    "sectionsWidget"
+    "sectionsWidget",
+    "subscriptionsWidget"
   ]);
   socket.resetAll();
 }
@@ -3225,6 +3662,135 @@ var styles = `
 
 .pdk_dashboard-page__outbound-grid__item__latency--red {
     color: var(--error-color-medium, red);
+}
+
+/* Subscription traffic/expiry cards */
+.pdk_dashboard-page__subscriptions {
+    margin-top: 10px;
+}
+
+.pdk_dashboard-page__subscriptions__title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.pdk_dashboard-page__subscriptions__title-updated {
+    font-size: 0.85em;
+}
+
+.pdk_dashboard-page__subscriptions__grid {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(var(--dashboard-grid-columns), 1fr);
+    grid-gap: 10px;
+}
+
+.pdk_dashboard-page__subscriptions__card {
+    border: 2px var(--background-color-low, lightgray) solid;
+    border-radius: 4px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pdk_dashboard-page__subscriptions__card--warning {
+    border-color: var(--warn-color-medium, orange);
+}
+
+.pdk_dashboard-page__subscriptions__card--skeleton {
+    height: 160px;
+}
+
+.pdk_dashboard-page__subscriptions__card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.pdk_dashboard-page__subscriptions__card-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pdk_dashboard-page__subscriptions__card-spacer {
+    min-height: 12px;
+}
+
+.pdk_dashboard-page__subscriptions__row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    line-height: 1.5;
+}
+
+.pdk_dashboard-page__subscriptions__row--muted {
+    color: var(--text-color-low, gray);
+    font-size: 0.9em;
+}
+
+.pdk_dashboard-page__subscriptions__row--error {
+    color: var(--error-color-medium, red);
+}
+
+.pdk_dashboard-page__subscriptions__row__key {
+    font-weight: 600;
+}
+
+.pdk_dashboard-page__subscriptions__bar {
+    height: 10px;
+    width: 100%;
+    border-radius: 6px;
+    background: var(--background-color-low, #e5e5e5);
+    overflow: hidden;
+}
+
+.pdk_dashboard-page__subscriptions__bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.3s ease;
+}
+
+.pdk_dashboard-page__subscriptions__bar-fill--green {
+    background: var(--success-color-medium, green);
+}
+
+.pdk_dashboard-page__subscriptions__bar-fill--yellow {
+    background: var(--warn-color-medium, orange);
+}
+
+.pdk_dashboard-page__subscriptions__bar-fill--red {
+    background: var(--error-color-medium, red);
+}
+
+.pdk_dashboard-page__subscriptions__badge {
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.pdk_dashboard-page__subscriptions__badge--yellow {
+    color: var(--warn-color-medium, orange);
+    border: 1px solid var(--warn-color-medium, orange);
+}
+
+.pdk_dashboard-page__subscriptions__badge--red {
+    color: var(--error-color-medium, red);
+    border: 1px solid var(--error-color-medium, red);
+}
+
+.pdk_dashboard-page__subscriptions__refresh {
+    white-space: nowrap;
+}
+
+.pdk_dashboard-page__subscriptions__updated {
+    margin-top: auto;
 }
 
 `;
