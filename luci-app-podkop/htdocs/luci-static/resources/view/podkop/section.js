@@ -10,6 +10,12 @@ function validateSubscriptionUrl(value) {
     return true;
   }
 
+  // UCI list values are consumed as whitespace-separated words by the shell
+  // backend, so local subscription files must have an absolute path without spaces.
+  if (value.startsWith("/") && !/[\s\u0000-\u001f]/.test(value)) {
+    return true;
+  }
+
   try {
     const url = new URL(value);
     return url.hostname && ["http:", "https:"].includes(url.protocol)
@@ -22,6 +28,16 @@ function validateSubscriptionUrl(value) {
 
 function createSectionContent(section, singBoxFeatures = []) {
   let o = section.option(
+    form.Flag,
+    "enabled",
+    _("✔ Enabled"),
+    _("Enable or disable this section without deleting its configuration"),
+  );
+  o.default = "1";
+  o.rmempty = false;
+  o.editable = true;
+
+  o = section.option(
     form.ListValue,
     "connection_type",
     _("Connection Type"),
@@ -39,6 +55,7 @@ function createSectionContent(section, singBoxFeatures = []) {
     _("Select how to configure the proxy"),
   );
   o.value("url", _("Connection URL"));
+  o.value("subscription", _("Subscription"));
   o.value("selector", _("Selector"));
   o.value("urltest", _("URLTest"));
   o.value("outbound", _("Outbound Config"));
@@ -46,10 +63,22 @@ function createSectionContent(section, singBoxFeatures = []) {
   o.depends("connection_type", "proxy");
 
   o = section.option(
+    form.DynamicList,
+    "subscription_urls",
+    _("Subscription Sources"),
+    _("HTTP(S) subscription links or absolute router file paths. Supports proxy links, Base64, Clash/Mihomo, sing-box, Xray and SIP008 formats; refreshed using the global update frequency"),
+  );
+  o.depends("proxy_config_type", "subscription");
+  o.rmempty = false;
+  o.validate = function (_section_id, value) {
+    return validateSubscriptionUrl(value);
+  };
+
+  o = section.option(
     form.TextValue,
     "proxy_string",
     _("Proxy Configuration URL"),
-    _("Links supported by podkop-engine; VMess, Hysteria, AnyTLS and NaiveProxy require podkop-engine-full")
+    _("The available proxy protocols depend on the installed sing-box-forkop build"),
   );
   o.depends("proxy_config_type", "url");
   o.rows = 5;
@@ -101,7 +130,7 @@ function createSectionContent(section, singBoxFeatures = []) {
     form.DynamicList,
     "selector_proxy_links",
     _("Selector Proxy Links"),
-    _("Links supported by podkop-engine; VMess, Hysteria, AnyTLS and NaiveProxy require podkop-engine-full. Direct links and subscriptions can be combined.")
+    _("Links supported by the installed sing-box-forkop build. Direct links and subscriptions can be combined."),
   );
   o.depends("proxy_config_type", "selector");
   o.rmempty = true;
@@ -123,8 +152,8 @@ function createSectionContent(section, singBoxFeatures = []) {
   o = section.option(
     form.DynamicList,
     "selector_subscription_urls",
-    _("Selector Subscription URLs"),
-    _("HTTP(S) subscription links returning proxy URLs; can be used alone or together with proxy links and are refreshed using the global list update frequency"),
+    _("Selector Subscription Sources"),
+    _("HTTP(S) subscription links or absolute router file paths. Supports proxy links, Base64, Clash/Mihomo, sing-box, Xray and SIP008 formats; refreshed using the global update frequency"),
   );
   o.depends("proxy_config_type", "selector");
   o.rmempty = true;
@@ -136,7 +165,7 @@ function createSectionContent(section, singBoxFeatures = []) {
     form.DynamicList,
     "urltest_proxy_links",
     _("URLTest Proxy Links"),
-    _("Links supported by podkop-engine; VMess, Hysteria, AnyTLS and NaiveProxy require podkop-engine-full. Direct links and subscriptions can be combined.")
+    _("Links supported by the installed sing-box-forkop build. Direct links and subscriptions can be combined."),
   );
   o.depends("proxy_config_type", "urltest");
   o.rmempty = true;
@@ -158,8 +187,8 @@ function createSectionContent(section, singBoxFeatures = []) {
   o = section.option(
     form.DynamicList,
     "urltest_subscription_urls",
-    _("URLTest Subscription URLs"),
-    _("HTTP(S) subscription links returning proxy URLs; can be used alone or together with proxy links and are refreshed using the global list update frequency"),
+    _("URLTest Subscription Sources"),
+    _("HTTP(S) subscription links or absolute router file paths. Supports proxy links, Base64, Clash/Mihomo, sing-box, Xray and SIP008 formats; refreshed using the global update frequency"),
   );
   o.depends("proxy_config_type", "urltest");
   o.rmempty = true;
@@ -803,6 +832,8 @@ function createSectionContent(section, singBoxFeatures = []) {
   for (const option of section.children) {
     option.modalonly = true;
   }
+  // Keep the enabled flag visible and directly editable in the sections grid.
+  section.children[0].modalonly = false;
 }
 
 const EntryPoint = {

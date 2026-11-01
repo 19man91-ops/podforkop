@@ -93,7 +93,8 @@ export namespace Podkop {
   export interface ConfigProxyUrlTestSection {
     connection_type: 'proxy';
     proxy_config_type: 'urltest';
-    urltest_proxy_links: string[];
+    urltest_proxy_links?: string[];
+    urltest_subscription_urls?: string[];
     urltest_fallback_links?: string[];
     urltest_download_check?: 'default' | 'off' | 'custom';
     urltest_download_url?: string;
@@ -102,7 +103,15 @@ export namespace Podkop {
   export interface ConfigProxySelectorSection {
     connection_type: 'proxy';
     proxy_config_type: 'selector';
-    selector_proxy_links: string[];
+    selector_proxy_links?: string[];
+    selector_subscription_urls?: string[];
+  }
+
+  export interface ConfigProxySubscriptionSection {
+    connection_type: 'proxy';
+    proxy_config_type: 'subscription';
+    subscription_urls?: string[];
+    selector_subscription_urls?: string[];
   }
 
   export interface ConfigProxyUrlSection {
@@ -133,6 +142,7 @@ export namespace Podkop {
   export type ConfigBaseSection =
     | ConfigProxyUrlTestSection
     | ConfigProxySelectorSection
+    | ConfigProxySubscriptionSection
     | ConfigProxyUrlSection
     | ConfigProxyOutboundSection
     | ConfigVpnSection
@@ -142,6 +152,7 @@ export namespace Podkop {
   export type ConfigSection = ConfigBaseSection & {
     '.name': string;
     '.type': 'settings' | 'section';
+    enabled?: string;
     yacd_secret_key?: string;
   };
 

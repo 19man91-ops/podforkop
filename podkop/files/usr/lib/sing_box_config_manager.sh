@@ -448,6 +448,17 @@ sing_box_cm_add_direct_outbound() {
         }]'
 }
 
+sing_box_cm_add_parser_outbound() {
+    local config="$1"
+    local tag="$2"
+    local link="$3"
+
+    echo "$config" | jq \
+        --arg tag "$tag" \
+        --arg link "$link" \
+        '.outbounds += [{type: "parser", tag: $tag, link: $link}]'
+}
+
 #######################################
 # Add a SOCKS outbound to the outbounds section of a sing-box JSON configuration.
 # Arguments:
@@ -1016,6 +1027,61 @@ sing_box_cm_add_urltest_outbound() {
         ]'
 }
 
+sing_box_cm_add_remote_subscription_provider() {
+    local config="$1"
+    local tag="$2"
+    local url="$3"
+    local interval="$4"
+
+    echo "$config" | jq \
+        --arg tag "$tag" \
+        --arg url "$url" \
+        --arg interval "$interval" \
+        '.providers = ((.providers // []) + [{
+            type: "remote",
+            tag: $tag,
+            url: $url,
+            update_interval: $interval
+        }])'
+}
+
+sing_box_cm_add_local_subscription_provider() {
+    local config="$1"
+    local tag="$2"
+    local path="$3"
+
+    echo "$config" | jq \
+        --arg tag "$tag" \
+        --arg path "$path" \
+        '.providers = ((.providers // []) + [{
+            type: "local",
+            tag: $tag,
+            path: $path
+        }])'
+}
+
+sing_box_cm_add_group_providers() {
+    local config="$1"
+    local group_tag="$2"
+    local providers="$3"
+
+    [ -n "$providers" ] || {
+        echo "$config"
+        return 0
+    }
+
+    echo "$config" | jq \
+        --arg tag "$group_tag" \
+        --argjson providers "$providers" \
+        '.outbounds |= map(
+            if .tag == $tag then
+                .providers = ((.providers // []) + $providers)
+            else
+                .
+            end
+        )'
+}
+
 #######################################
 # Add a Selector outbound to the outbounds section of a sing-box JSON configuration.
 # Arguments:
@@ -1045,9 +1111,9 @@ sing_box_cm_add_selector_outbound() {
             {
                 type: "selector",
                 tag: $tag,
-                outbounds: $outbounds,
-                default: $default
+                outbounds: $outbounds
             }
+            + (if $default != "" then {default: $default} else {} end)
             + (if $interrupt_exist_connections == "true" then {interrupt_exist_connections: true} else {} end)
         ]'
 }

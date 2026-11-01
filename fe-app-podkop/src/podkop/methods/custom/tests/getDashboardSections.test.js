@@ -88,4 +88,58 @@ describe('getDashboardSections, urltest section', () => {
 
     expect(await tileNames()).toEqual(['Fastest', 'A', 'main-fallback-1-out']);
   });
+
+  it('renders provider nodes for selector sections with subscriptions', async () => {
+    getConfigSections.mockResolvedValue([
+      {
+        '.name': 'sub_section',
+        connection_type: 'proxy',
+        proxy_config_type: 'selector',
+        selector_subscription_urls: ['https://example.com/sub'],
+      },
+    ]);
+    PodkopShellMethods.getClashApiProxies.mockResolvedValue({
+      success: true,
+      data: {
+        proxies: {
+          'sub_section-out': proxy('sub_section-out', {
+            type: 'Selector',
+            now: 'FI-ruspace',
+            all: ['FI-ruspace', 'FI-ruspace-Yulya-FI'],
+          }),
+          'FI-ruspace': proxy('FI-ruspace', { type: 'VLESS' }),
+          'FI-ruspace-Yulya-FI': proxy('FI-ruspace-Yulya-FI', { type: 'Hysteria2' }),
+        },
+      },
+    });
+
+    const result = await getDashboardSections();
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].withTagSelect).toBe(true);
+    expect(result.data[0].outbounds.map((o) => o.displayName)).toEqual([
+      'FI-ruspace',
+      'FI-ruspace-Yulya-FI',
+    ]);
+    expect(result.data[0].outbounds[0].selected).toBe(true);
+    expect(result.data[0].outbounds[1].selected).toBe(false);
+  });
+
+  it('skips disabled sections on the dashboard', async () => {
+    getConfigSections.mockResolvedValue([
+      {
+        '.name': 'disabled_sec',
+        enabled: '0',
+        connection_type: 'proxy',
+        proxy_config_type: 'url',
+        proxy_string: 'vless://id@127.0.0.1:443?type=tcp&security=tls#Disabled',
+      },
+    ]);
+    PodkopShellMethods.getClashApiProxies.mockResolvedValue({
+      success: true,
+      data: { proxies: {} },
+    });
+
+    const result = await getDashboardSections();
+    expect(result.data).toHaveLength(0);
+  });
 });

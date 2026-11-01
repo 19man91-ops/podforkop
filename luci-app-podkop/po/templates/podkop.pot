@@ -20,6 +20,18 @@ msgstr ""
 msgid "✔ Enabled"
 msgstr ""
 
+msgid "Enable or disable this section without deleting its configuration"
+msgstr ""
+
+msgid "The available proxy protocols depend on the installed sing-box-forkop build"
+msgstr ""
+
+msgid "Links supported by the installed sing-box-forkop build. Direct links and subscriptions can be combined."
+msgstr ""
+
+msgid "HTTP(S) subscription links or absolute router file paths. Supports proxy links, Base64, Clash/Mihomo, sing-box, Xray and SIP008 formats; refreshed using the global update frequency"
+msgstr ""
+
 #: src\podkop\tabs\dashboard\initController.ts:356
 msgid "✔ Running"
 msgstr ""
@@ -903,7 +915,7 @@ msgid "Selector Proxy Links"
 msgstr ""
 
 #: ..\luci-app-podkop\htdocs\luci-static\resources\view\podkop\section.js:126
-msgid "Selector Subscription URLs"
+msgid "Selector Subscription Sources"
 msgstr ""
 
 #: src\podkop\tabs\dashboard\initController.ts:340
@@ -1090,6 +1102,12 @@ msgid "URLTest"
 msgstr ""
 
 #: ..\luci-app-podkop\htdocs\luci-static\resources\view\podkop\section.js:197
+msgid "Subscription"
+msgstr ""
+
+msgid "Subscription Sources"
+msgstr ""
+
 msgid "URLTest Check Interval"
 msgstr ""
 
@@ -1098,7 +1116,7 @@ msgid "URLTest Proxy Links"
 msgstr ""
 
 #: ..\luci-app-podkop\htdocs\luci-static\resources\view\podkop\section.js:161
-msgid "URLTest Subscription URLs"
+msgid "URLTest Subscription Sources"
 msgstr ""
 
 #: ..\luci-app-podkop\htdocs\luci-static\resources\view\podkop\section.js:233

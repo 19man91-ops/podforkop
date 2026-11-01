@@ -572,22 +572,31 @@ function validateProxyUrl(url) {
   if (trimmedUrl.startsWith("hysteria2://") || trimmedUrl.startsWith("hy2://")) {
     return validateHysteria2Url(trimmedUrl);
   }
+  if (trimmedUrl.startsWith("/") && !/[\s\u0000-\u001f]/.test(trimmedUrl)) {
+    return { valid: true, message: _("Valid") };
+  }
   const engineScheme = trimmedUrl.match(/^([a-z][a-z0-9+.-]*):\/\//i)?.[1]?.toLowerCase();
   if (engineScheme && [
     "vmess",
     "hysteria",
+    "hy",
     "http",
     "https",
     "anytls",
     "naive+https",
-    "naive+quic"
+    "naive+quic",
+    "http2",
+    "http3",
+    "tt",
+    "mieru",
+    "mierus"
   ].includes(engineScheme) && trimmedUrl.length > engineScheme.length + 3) {
     return { valid: true, message: _("Valid") };
   }
   return {
     valid: false,
     message: _(
-      "Supported links: VLESS, VMess, Trojan, Shadowsocks, SOCKS, Hysteria, TUIC, HTTP(S), AnyTLS, and NaiveProxy"
+      "Supported links: VLESS, Trojan, Shadowsocks, Hysteria2, VMess, TUIC, SOCKS, AnyTLS, NaiveProxy, and subscriptions"
     )
   };
 }
@@ -745,13 +754,32 @@ async function getDashboardSections() {
     })
   );
   const data = configSections.filter(
-    (section) => section.connection_type !== "block" && section.connection_type !== "exclusion" && section[".type"] !== "settings"
+    (section) => section.enabled !== "0" && section.connection_type !== "block" && section.connection_type !== "exclusion" && section[".type"] !== "settings"
   ).map((section) => {
     if (section.connection_type === "proxy") {
       if (section.proxy_config_type === "url") {
         const outbound = proxies.find(
           (proxy) => proxy.code === `${section[".name"]}-out`
         );
+        if (outbound?.value?.type === "selector" && (outbound?.value?.all?.length ?? 0) > 0) {
+          const allCodes = outbound.value.all ?? [];
+          const outbounds = allCodes.map((code) => {
+            const node = proxies.find((p) => p.code === code);
+            return {
+              code,
+              displayName: node?.value?.name || code,
+              latency: node?.value?.history?.[0]?.delay || 0,
+              type: node?.value?.type || "",
+              selected: outbound.value?.now === code
+            };
+          });
+          return {
+            withTagSelect: true,
+            code: outbound.code,
+            displayName: section[".name"],
+            outbounds
+          };
+        }
         const activeConfigs = splitProxyString(section.proxy_string);
         const proxyDisplayName = getProxyUrlName(activeConfigs?.[0]) || outbound?.value?.name || "";
         return {
@@ -791,23 +819,51 @@ async function getDashboardSections() {
           ]
         };
       }
-      if (section.proxy_config_type === "selector") {
+      if (section.proxy_config_type === "selector" || section.proxy_config_type === "subscription") {
         const selector = proxies.find(
           (proxy) => proxy.code === `${section[".name"]}-out`
         );
-        const links = section.selector_proxy_links ?? [];
-        const outbounds = links.map((link, index) => ({
-          link,
-          outbound: proxies.find(
-            (item) => item.code === `${section[".name"]}-${index + 1}-out`
-          )
-        })).map((item) => ({
-          code: item?.outbound?.code || "",
-          displayName: getProxyUrlName(item.link) || item?.outbound?.value?.name || "",
-          latency: item?.outbound?.value?.history?.[0]?.delay || 0,
-          type: item?.outbound?.value?.type || "",
-          selected: selector?.value?.now === item?.outbound?.code
-        }));
+        const links = section.proxy_config_type === "selector" ? section.selector_proxy_links ?? [] : [];
+        const allCodes = selector?.value?.all ?? [];
+        let outbounds;
+        if (allCodes.length > 0) {
+          outbounds = allCodes.map((code) => {
+            const item = proxies.find((p) => p.code === code);
+            let displayName = "";
+            const linkMatch = code.match(
+              new RegExp(`^${section[".name"]}-(\\d+)-out$`)
+            );
+            if (linkMatch) {
+              const linkIndex = parseInt(linkMatch[1], 10) - 1;
+              if (links[linkIndex]) {
+                displayName = getProxyUrlName(links[linkIndex]);
+              }
+            }
+            if (!displayName) {
+              displayName = item?.value?.name || code;
+            }
+            return {
+              code,
+              displayName,
+              latency: item?.value?.history?.[0]?.delay || 0,
+              type: item?.value?.type || "",
+              selected: selector?.value?.now === code
+            };
+          });
+        } else {
+          outbounds = links.map((link, index) => ({
+            link,
+            outbound: proxies.find(
+              (item) => item.code === `${section[".name"]}-${index + 1}-out`
+            )
+          })).map((item) => ({
+            code: item?.outbound?.code || "",
+            displayName: getProxyUrlName(item.link) || item?.outbound?.value?.name || "",
+            latency: item?.outbound?.value?.history?.[0]?.delay || 0,
+            type: item?.outbound?.value?.type || "",
+            selected: selector?.value?.now === item?.outbound?.code
+          }));
+        }
         return {
           withTagSelect: true,
           code: selector?.code || section[".name"],
@@ -826,13 +882,38 @@ async function getDashboardSections() {
           ...section.urltest_proxy_links ?? [],
           ...section.urltest_fallback_links ?? []
         ];
-        const outbounds = (outbound?.value?.all ?? []).map((code) => proxies.find((item) => item.code === code)).map((item, index) => ({
-          code: item?.code || "",
-          displayName: getProxyUrlName(links[index]) || item?.value?.name || "",
-          latency: item?.value?.history?.[0]?.delay || 0,
-          type: item?.value?.type || "",
-          selected: selector?.value?.now === item?.code
-        }));
+        const allCodes = outbound?.value?.all ?? [];
+        let outbounds;
+        if (allCodes.length > 0) {
+          outbounds = allCodes.map((code, index) => {
+            const item = proxies.find((p) => p.code === code);
+            let displayName = "";
+            const linkMatch = code.match(
+              new RegExp(`^${section[".name"]}-(?:fallback-)?(\\d+)-out$`)
+            );
+            if (linkMatch && links[index]) {
+              displayName = getProxyUrlName(links[index]);
+            }
+            if (!displayName) {
+              displayName = item?.value?.name || code;
+            }
+            return {
+              code: item?.code || code,
+              displayName,
+              latency: item?.value?.history?.[0]?.delay || 0,
+              type: item?.value?.type || "",
+              selected: selector?.value?.now === (item?.code || code)
+            };
+          });
+        } else {
+          outbounds = (outbound?.value?.all ?? []).map((code) => proxies.find((item) => item.code === code)).map((item, index) => ({
+            code: item?.code || "",
+            displayName: getProxyUrlName(links[index]) || item?.value?.name || "",
+            latency: item?.value?.history?.[0]?.delay || 0,
+            type: item?.value?.type || "",
+            selected: selector?.value?.now === item?.code
+          }));
+        }
         return {
           withTagSelect: true,
           code: selector?.code || section[".name"],

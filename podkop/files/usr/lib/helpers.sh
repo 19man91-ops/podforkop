@@ -48,6 +48,40 @@ is_shadowsocks_userinfo_format() {
     [[ "$str" =~ $regex ]]
 }
 
+# Sections remain enabled unless explicitly turned off. This keeps existing
+# configurations working when upgraded from versions without the option.
+section_is_enabled() {
+    local section="$1"
+    local enabled
+
+    config_get_bool enabled "$section" "enabled" 1
+    [ "$enabled" -eq 1 ]
+}
+
+sing_box_uses_subscription_providers() {
+    [ -r /usr/share/sing-box-forkop/variant ] && return 0
+    [ -d /usr/share/sing-box-forkop ] && return 0
+    if command -v sing-box >/dev/null 2>&1 && sing-box version 2>&1 | grep -qi 'forkop'; then
+        return 0
+    fi
+    if command -v apk >/dev/null 2>&1 && apk list --installed 2>/dev/null | awk '
+        {
+            name = $1
+            sub(/^</, "", name)
+            sub(/>$/, "", name)
+            sub(/-[0-9].*$/, "", name)
+            if (name == "sing-box-forkop") found = 1
+        }
+        END { exit !found }
+    '; then
+        return 0
+    fi
+    if command -v opkg >/dev/null 2>&1 && opkg list-installed 2>/dev/null | grep -q '^sing-box-forkop '; then
+        return 0
+    fi
+    return 1
+}
+
 # Compares the current package version with the required minimum
 is_min_package_version() {
     local current="$1"
@@ -128,7 +162,15 @@ url_decode() {
 # Prints the features the installed sing-box reports in the "Features:" line of
 # "sing-box version", comma-separated; nothing for a sing-box without that line
 sing_box_get_features() {
-    sing-box version 2> /dev/null | sed -n 's/^Features:[[:space:]]*//p'
+    local features
+    features="$(sing-box version 2> /dev/null | sed -n 's/^Features:[[:space:]]*//p')"
+    if [ -z "$features" ] && sing_box_uses_subscription_providers; then
+        features="urltest.fallbacks,urltest.download_url,subscription_providers,tools.decode-link"
+        local tags
+        tags="$(sing-box version 2> /dev/null | sed -n 's/^Tags:[[:space:]]*//p')"
+        [ -n "$tags" ] && features="$features,$tags"
+    fi
+    echo "$features"
 }
 
 # Checks if the installed sing-box reports the given feature

@@ -37,8 +37,13 @@ export function validateProxyUrl(url: string): ValidationResult {
     return validateHysteria2Url(trimmedUrl);
   }
 
-  // These link types are parsed and validated by podkop-engine. Some require
-  // the optional podkop-engine-full package instead of the default slim build.
+  // UCI list values are consumed as whitespace-separated words by the shell
+  // backend, so local subscription files must have an absolute path without spaces.
+  if (trimmedUrl.startsWith('/') && !/[\s\u0000-\u001f]/.test(trimmedUrl)) {
+    return { valid: true, message: _('Valid') };
+  }
+
+  // These link types are parsed and validated by sing-box-forkop or podkop-engine.
   const engineScheme = trimmedUrl
     .match(/^([a-z][a-z0-9+.-]*):\/\//i)?.[1]
     ?.toLowerCase();
@@ -47,11 +52,17 @@ export function validateProxyUrl(url: string): ValidationResult {
     [
       'vmess',
       'hysteria',
+      'hy',
       'http',
       'https',
       'anytls',
       'naive+https',
       'naive+quic',
+      'http2',
+      'http3',
+      'tt',
+      'mieru',
+      'mierus',
     ].includes(engineScheme) &&
     trimmedUrl.length > engineScheme.length + 3
   ) {
@@ -61,7 +72,7 @@ export function validateProxyUrl(url: string): ValidationResult {
   return {
     valid: false,
     message: _(
-      'Supported links: VLESS, VMess, Trojan, Shadowsocks, SOCKS, Hysteria, TUIC, HTTP(S), AnyTLS, and NaiveProxy',
+      'Supported links: VLESS, Trojan, Shadowsocks, Hysteria2, VMess, TUIC, SOCKS, AnyTLS, NaiveProxy, and subscriptions',
     ),
   };
 }

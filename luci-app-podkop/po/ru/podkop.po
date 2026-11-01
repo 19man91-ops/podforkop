@@ -20,6 +20,18 @@ msgstr ""
 msgid "✔ Enabled"
 msgstr "✔ Включено"
 
+msgid "Enable or disable this section without deleting its configuration"
+msgstr "Включайте и отключайте секцию, не удаляя её настройки"
+
+msgid "The available proxy protocols depend on the installed sing-box-forkop build"
+msgstr "Доступные протоколы прокси зависят от установленной сборки sing-box-forkop"
+
+msgid "Links supported by the installed sing-box-forkop build. Direct links and subscriptions can be combined."
+msgstr "Поддерживаемые установленной сборкой sing-box-forkop ссылки. Прямые ссылки и подписки можно использовать вместе."
+
+msgid "HTTP(S) subscription links or absolute router file paths. Supports proxy links, Base64, Clash/Mihomo, sing-box, Xray and SIP008 formats; refreshed using the global update frequency"
+msgstr "HTTP(S)-ссылки на подписки или абсолютные пути к файлам на роутере. Поддерживаются ссылки прокси, Base64, Clash/Mihomo, sing-box, Xray и SIP008; обновление выполняется с общей периодичностью"
+
 msgid "✔ Running"
 msgstr "✔ Работает"
 
@@ -651,7 +663,7 @@ msgid "Selector Proxy Links"
 msgstr "Ссылки прокси для Selector"
 
 msgid "Selector Subscription URLs"
-msgstr "Ссылки на подписки для Selector"
+msgstr "Источники подписок для Selector"
 
 msgid "Services info"
 msgstr "Информация о сервисах"
@@ -779,6 +791,12 @@ msgstr "Исходящий"
 msgid "URL must use one of the following protocols:"
 msgstr "URL должен использовать один из следующих протоколов:"
 
+msgid "Subscription"
+msgstr "Подписка"
+
+msgid "Subscription Sources"
+msgstr "Источники подписки"
+
 msgid "URLTest"
 msgstr "URLTest"
 
@@ -789,7 +807,13 @@ msgid "URLTest Proxy Links"
 msgstr "Ссылки прокси для URLTest"
 
 msgid "URLTest Subscription URLs"
-msgstr "Ссылки на подписки для URLTest"
+msgstr "Источники подписок для URLTest"
+
+msgid "Selector Subscription Sources"
+msgstr "Источники подписок для Selector"
+
+msgid "URLTest Subscription Sources"
+msgstr "Источники подписок для URLTest"
 
 msgid "URLTest Testing URL"
 msgstr "URLTest ссылка для проверки"

@@ -3,6 +3,7 @@
 
 REPO="https://api.github.com/repos/19man91-ops/podforkop/releases/latest"
 ENGINE_REPO="https://api.github.com/repos/19man91-ops/podforkop/releases/tags/podkop-engine-current"
+FORKOP_CORE_REPO="https://api.github.com/repos/19man91-ops/podforkop/releases/tags/sing-box-forkop-current"
 DOWNLOAD_DIR="/tmp/podkop"
 COUNT=3
 
@@ -177,7 +178,18 @@ main() {
         exit 1
     fi
 
-    install_podkop_engine "$pkg_ext"
+    case "${PODFORCOP_CORE:-forkop}" in
+        forkop)
+            install_sing_box_forkop "$pkg_ext"
+            ;;
+        podkop-engine)
+            install_podkop_engine "$pkg_ext"
+            ;;
+        *)
+            msg "PODFORCOP_CORE must be 'forkop' or 'podkop-engine'."
+            exit 1
+            ;;
+    esac
 
     for pkg in podkop luci-app-podkop; do
         file=""
@@ -270,6 +282,8 @@ install_podkop_engine() {
         installed_engine_package="podkop-engine-full"
     elif pkg_is_installed "podkop-engine"; then
         installed_engine_package="podkop-engine"
+    elif pkg_is_installed "sing-box-forkop"; then
+        installed_engine_package="sing-box-forkop"
     fi
 
     arch=$(get_package_arch) || {
@@ -359,11 +373,114 @@ install_podkop_engine() {
     fi
 }
 
+install_sing_box_forkop() {
+    local pkg_ext="$1"
+    local variant="${PODFORCOP_FORKOP_VARIANT:-}"
+    local arch release_data asset filename filepath checksum_url checksum_file expected_hash actual_hash
+    local attempt package
+
+    if [ -z "$variant" ] && [ -r /usr/share/sing-box-forkop/variant ]; then
+        variant=$(cat /usr/share/sing-box-forkop/variant)
+    fi
+    [ -n "$variant" ] || variant="base"
+
+    case "$variant" in
+        tiny|base|full) ;;
+        *)
+            msg "PODFORCOP_FORKOP_VARIANT must be 'tiny', 'base', or 'full'."
+            exit 1
+            ;;
+    esac
+
+    arch=$(get_package_arch) || {
+        msg "Could not determine the OpenWrt package architecture for sing-box-forkop."
+        exit 1
+    }
+
+    msg "Finding sing-box-forkop $variant package for $arch..."
+    release_data="$DOWNLOAD_DIR/sing-box-forkop-release.json"
+    if ! wget -q -O "$release_data" "$FORKOP_CORE_REPO"; then
+        msg "Could not read the sing-box-forkop package mirror from the PodForCOP repository."
+        exit 1
+    fi
+
+    asset=$(tr '{' '\n' < "$release_data" \
+        | sed -n "s|.*\"url\":\"\\([^\"]*/releases/assets/[0-9]*\\)\".*\"name\":\"\\(sing-box-forkop_[^\"]*_${variant}_${arch}\\.${pkg_ext}\\)\".*|\\1 \\2|p" \
+        | head -n 1)
+    if [ -z "$asset" ]; then
+        msg "The PodForCOP sing-box-forkop mirror has no $pkg_ext $variant package for OpenWrt architecture $arch."
+        exit 1
+    fi
+
+    checksum_url=$(tr '{' '\n' < "$release_data" \
+        | sed -n 's|.*"url":"\([^\"]*/releases/assets/[0-9]*\)".*"name":"SHA256SUMS".*|\1|p' \
+        | head -n 1)
+    if [ -z "$checksum_url" ]; then
+        msg "The sing-box-forkop mirror has no SHA256SUMS asset."
+        exit 1
+    fi
+    checksum_file="$DOWNLOAD_DIR/sing-box-forkop-SHA256SUMS"
+    if ! wget -q --header="Accept: application/octet-stream" -O "$checksum_file" "$checksum_url" \
+        || [ ! -s "$checksum_file" ]; then
+        msg "Could not download sing-box-forkop checksums."
+        exit 1
+    fi
+
+    filename=${asset#* }
+    filepath="$DOWNLOAD_DIR/$filename"
+    attempt=0
+    while [ "$attempt" -lt "$COUNT" ]; do
+        msg "Downloading $filename (attempt $((attempt + 1)))..."
+        if wget -q --header="Accept: application/octet-stream" -O "$filepath" "${asset%% *}" \
+            && [ -s "$filepath" ]; then
+            break
+        fi
+        rm -f "$filepath"
+        attempt=$((attempt + 1))
+    done
+    if [ "$attempt" -eq "$COUNT" ]; then
+        msg "Failed to download $filename after $COUNT attempts."
+        exit 1
+    fi
+
+    expected_hash=$(awk -v filename="$filename" '{ name=$2; sub(/^\*/, "", name); sub(/^\.\//, "", name); if (name == filename) { print $1; exit } }' "$checksum_file")
+    actual_hash=$(sha256sum "$filepath" | awk '{print $1}')
+    if [ -z "$expected_hash" ] || [ "$actual_hash" != "$expected_hash" ]; then
+        msg "Checksum verification failed for $filename."
+        rm -f "$filepath"
+        exit 1
+    fi
+
+    service podkop stop >/dev/null 2>&1 || true
+    if [ "$PKG_IS_APK" -eq 0 ]; then
+        for package in podkop-engine podkop-engine-full sing-box sing-box-tiny sing-box-forkop; do
+            if pkg_is_installed "$package"; then
+                msg "Replacing $package with sing-box-forkop..."
+                pkg_remove "$package" >/dev/null 2>&1 || {
+                    msg "Could not remove the previous core package $package."
+                    exit 1
+                }
+            fi
+        done
+    fi
+
+    msg "Installing $filename..."
+    if [ "$PKG_IS_APK" -eq 1 ]; then
+        if ! apk add --allow-untrusted "$filepath"; then
+            msg "Could not install sing-box-forkop. Check available flash space and package-manager output."
+            exit 1
+        fi
+    elif ! pkg_install "$filepath"; then
+        msg "Could not install sing-box-forkop. Check available flash space and package-manager output."
+        exit 1
+    fi
+}
+
 get_reclaimable_space_kb() {
     local package installed_size reclaimable_space_kb package_control
 
     reclaimable_space_kb=0
-    for package in sing-box sing-box-tiny podkop-engine podkop-engine-full; do
+    for package in sing-box sing-box-tiny podkop-engine podkop-engine-full sing-box-forkop; do
         if ! pkg_is_installed "$package"; then
             continue
         fi
@@ -393,6 +510,13 @@ get_reclaimable_space_kb() {
                         }
                     }
                 ')
+            if [ -z "$installed_size" ]; then
+                installed_size=$(du -sk \
+                    /overlay/upper/usr/bin/sing-box \
+                    /overlay/upper/etc/init.d/sing-box \
+                    /overlay/upper/etc/config/sing-box 2>/dev/null \
+                    | awk '{ total += $1 } END { if (total) printf "%.0f", total }')
+            fi
             case "$installed_size" in
                 ''|*[!0-9]*) continue ;;
             esac
@@ -444,9 +568,19 @@ check_system() {
     AVAILABLE_SPACE=$(df /overlay | awk 'NR==2 {print $4}')
     RECLAIMABLE_SPACE=$(get_reclaimable_space_kb)
     EFFECTIVE_SPACE=$((AVAILABLE_SPACE + RECLAIMABLE_SPACE))
-    REQUIRED_SPACE=25600 # 25 MiB in KiB; includes the podkop-engine core
-    if [ "${PODFORCOP_ENGINE_VARIANT:-}" = "full" ] || pkg_is_installed "podkop-engine-full"; then
-        REQUIRED_SPACE=46080 # 45 MiB for the larger full engine build
+    REQUIRED_SPACE=25600
+    if [ "${PODFORCOP_CORE:-forkop}" = "podkop-engine" ]; then
+        if [ "${PODFORCOP_ENGINE_VARIANT:-}" = "full" ] || pkg_is_installed "podkop-engine-full"; then
+            REQUIRED_SPACE=46080
+        fi
+    else
+        REQUIRED_SPACE=46080 # sing-box-forkop base package and PodForCOP files
+        forkop_variant="${PODFORCOP_FORKOP_VARIANT:-}"
+        if [ -z "$forkop_variant" ] && [ -r /usr/share/sing-box-forkop/variant ]; then
+            forkop_variant=$(cat /usr/share/sing-box-forkop/variant)
+        fi
+        [ "$forkop_variant" != "tiny" ] || REQUIRED_SPACE=35840
+        [ "$forkop_variant" != "full" ] || REQUIRED_SPACE=56320
     fi
 
     if [ "$EFFECTIVE_SPACE" -lt "$REQUIRED_SPACE" ]; then

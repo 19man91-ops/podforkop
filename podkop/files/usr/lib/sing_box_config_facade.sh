@@ -61,6 +61,11 @@ sing_box_cf_add_proxy_outbound() {
     local url="$3"
     local udp_over_tcp="$4"
 
+    if sing_box_uses_subscription_providers; then
+        sing_box_cm_add_parser_outbound "$config" "$(get_outbound_tag_by_section "$section")" "$url"
+        return
+    fi
+
     case "$(url_get_scheme "$url")" in
     vless | vmess | trojan | ss | socks | socks4 | socks4a | socks5 | socks5h | hysteria2 | hy2 | hysteria | tuic | http | https | anytls | naive+https | naive+quic)
         # Use the engine's URI decoder so subscriptions retain protocol-specific
