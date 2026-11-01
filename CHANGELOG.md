@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.7
+
+### Документация
+- **README:** блоки «Что нового» (0.9.3–0.9.6) убраны из README и перенесены в этот CHANGELOG;
+  в README добавлена ссылка на CHANGELOG и список свежих релизов.
+- **README:** добавлен раздел **«Чем PodForCOP отличается от Podkop и sing-box-forkop»**:
+  таблица ролей проектов, что именно позаимствовано из Podkop и sing-box-forkop
+  (архитектура секций/rulesets/DNS/FakeIP/nftables, LuCI-основа, ядро forkop и его
+  providers/parser/DNS fallback/XHTTP) и перечень собственных доработок PodForCOP.
+
 ## 0.9.6
 
 ### Новое
