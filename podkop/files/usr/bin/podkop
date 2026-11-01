@@ -14,6 +14,7 @@ check_required_file /lib/functions.sh
 check_required_file /lib/config/uci.sh
 check_required_file /lib/functions/network.sh
 check_required_file "$PODKOP_LIB/constants.sh"
+check_required_file "$PODKOP_LIB/subscriptions.sh"
 check_required_file "$PODKOP_LIB/nft.sh"
 check_required_file "$PODKOP_LIB/helpers.sh"
 check_required_file "$PODKOP_LIB/sing_box_config_manager.sh"
@@ -24,6 +25,7 @@ check_required_file "$PODKOP_LIB/rulesets.sh"
 . /lib/config/uci.sh
 . /lib/functions/network.sh
 . "$PODKOP_LIB/constants.sh"
+. "$PODKOP_LIB/subscriptions.sh"
 . "$PODKOP_LIB/nft.sh"
 . "$PODKOP_LIB/helpers.sh"
 . "$PODKOP_LIB/sing_box_config_manager.sh"
@@ -78,22 +80,25 @@ check_requirements() {
     if has_outbound_section; then
         log "Outbound section found" "debug"
     else
-        log "Outbound section not found. Please check your configuration file (missing proxy_string, selector_proxy_links, urltest_proxy_links, outbound_json, or interface). Aborted." "error"
+        log "Outbound section not found. Please check your configuration file (missing proxy_string, selector_proxy_links, selector_subscription_urls, urltest_proxy_links, urltest_subscription_urls, outbound_json, or interface). Aborted." "error"
         exit 1
     fi
 }
 
 _check_outbound_section() {
     local section="$1"
-    local proxy_string interface outbound_json urltest_proxy_links
+    local proxy_string interface outbound_json selector_proxy_links urltest_proxy_links selector_subscription_urls urltest_subscription_urls
 
     config_get proxy_string "$section" "proxy_string"
     config_get selector_proxy_links "$section" "selector_proxy_links"
     config_get urltest_proxy_links "$section" "urltest_proxy_links"
+    config_get selector_subscription_urls "$section" "selector_subscription_urls"
+    config_get urltest_subscription_urls "$section" "urltest_subscription_urls"
     config_get outbound_json "$section" "outbound_json"
     config_get interface "$section" "interface"
 
     if [ -n "$proxy_string" ] || [ -n "$selector_proxy_links" ] || [ -n "$urltest_proxy_links" ] ||
+        [ -n "$selector_subscription_urls" ] || [ -n "$urltest_subscription_urls" ] ||
         [ -n "$outbound_json" ] || [ -n "$interface" ]; then
         section_exists=0
     fi
@@ -126,6 +131,9 @@ start_main() {
     mkdir -p "$TMP_SING_BOX_FOLDER"
     mkdir -p "$TMP_RULESET_FOLDER"
 
+    subscription_refresh_all
+    configure_cron_jobs
+
     # base
     route_table_rule_mark
     create_nft_rules
@@ -133,7 +141,6 @@ start_main() {
 
     # sing-box
     sing_box_init_config
-    config_foreach add_cron_job "section"
     /etc/init.d/sing-box start
 
     log "Nice"
@@ -432,29 +439,58 @@ dnsmasq_restore() {
     /etc/init.d/dnsmasq restart
 }
 
-add_cron_job() {
-    ## Future: make a check so that it doesn't recreate many times
-    local community_lists remote_domain_lists remote_subnet_lists update_interval
+collect_cron_job_flags() {
+    local section="$1"
+    local community_lists remote_domain_lists remote_subnet_lists
+    local selector_subscription_urls urltest_subscription_urls
+
     config_get community_lists "$section" "community_lists"
     config_get remote_domain_lists "$section" "remote_domain_lists"
     config_get remote_subnet_lists "$section" "remote_subnet_lists"
-    config_get update_interval "settings" "update_interval"
+    if [ -n "$community_lists" ] || [ -n "$remote_domain_lists" ] || [ -n "$remote_subnet_lists" ]; then
+        PODKOP_HAS_LISTS_TO_UPDATE=1
+    fi
 
+    config_get selector_subscription_urls "$section" "selector_subscription_urls"
+    config_get urltest_subscription_urls "$section" "urltest_subscription_urls"
+    if [ -n "$selector_subscription_urls" ] || [ -n "$urltest_subscription_urls" ]; then
+        PODKOP_HAS_SUBSCRIPTIONS_TO_UPDATE=1
+    fi
+}
+
+configure_cron_jobs() {
+    local update_interval cron_job subscription_cron_job
+
+    PODKOP_HAS_LISTS_TO_UPDATE=0
+    PODKOP_HAS_SUBSCRIPTIONS_TO_UPDATE=0
+    config_foreach collect_cron_job_flags "section"
+    remove_cron_job
+
+    if [ "$PODKOP_HAS_LISTS_TO_UPDATE" != "1" ] && [ "$PODKOP_HAS_SUBSCRIPTIONS_TO_UPDATE" != "1" ]; then
+        return
+    fi
+
+    config_get update_interval "settings" "update_interval" "1d"
     case "$update_interval" in
     "1h")
         cron_job="13 * * * * /usr/bin/podkop list_update"
+        subscription_cron_job="13 * * * * /usr/bin/podkop subscription_update"
         ;;
     "3h")
         cron_job="13 */3 * * * /usr/bin/podkop list_update"
+        subscription_cron_job="13 */3 * * * /usr/bin/podkop subscription_update"
         ;;
     "12h")
         cron_job="13 */12 * * * /usr/bin/podkop list_update"
+        subscription_cron_job="13 */12 * * * /usr/bin/podkop subscription_update"
         ;;
     "1d")
         cron_job="13 9 * * * /usr/bin/podkop list_update"
+        subscription_cron_job="13 9 * * * /usr/bin/podkop subscription_update"
         ;;
     "3d")
         cron_job="13 9 */3 * * /usr/bin/podkop list_update"
+        subscription_cron_job="13 9 */3 * * /usr/bin/podkop subscription_update"
         ;;
     *)
         log "Invalid update_interval value: $update_interval"
@@ -462,21 +498,18 @@ add_cron_job() {
         ;;
     esac
 
-    if [ -n "$community_lists" ] ||
-        [ -n "$remote_domain_lists" ] ||
-        [ -n "$remote_subnet_lists" ]; then
-        remove_cron_job
-        crontab -l | {
-            cat
-            echo "$cron_job"
-        } | crontab -
-        log "The cron job has been created: $cron_job"
-    fi
+    {
+        crontab -l 2>/dev/null | grep -v -E '/usr/bin/podkop (list_update|subscription_update)'
+        [ "$PODKOP_HAS_LISTS_TO_UPDATE" = "1" ] && echo "$cron_job"
+        [ "$PODKOP_HAS_SUBSCRIPTIONS_TO_UPDATE" = "1" ] && echo "$subscription_cron_job"
+    } | crontab -
+    [ "$PODKOP_HAS_LISTS_TO_UPDATE" = "1" ] && log "The cron job has been created: $cron_job"
+    [ "$PODKOP_HAS_SUBSCRIPTIONS_TO_UPDATE" = "1" ] && log "The subscription cron job has been created: $subscription_cron_job"
 }
 
 remove_cron_job() {
-    (crontab -l | grep -v "/usr/bin/podkop list_update") | crontab -
-    log "The cron job removed"
+    (crontab -l 2>/dev/null | grep -v -E '/usr/bin/podkop (list_update|subscription_update)') | crontab -
+    log "The cron jobs removed"
 }
 
 list_update() {
@@ -651,15 +684,23 @@ configure_outbound_handler() {
             ;;
         selector)
             log "Detected proxy configuration type: selector" "debug"
-            local selector_proxy_links udp_over_tcp i outbound_tags outbound_tag default_outbound
+            local selector_proxy_links selector_subscription_urls subscription_links udp_over_tcp i outbound_tags outbound_tag default_outbound old_noglob
             config_get selector_proxy_links "$section" "selector_proxy_links"
+            config_get selector_subscription_urls "$section" "selector_subscription_urls"
             config_get udp_over_tcp "$section" "enable_udp_over_tcp"
+            subscription_links="$(subscription_cached_links "$section" selector "$selector_subscription_urls")"
+            selector_proxy_links="$selector_proxy_links $subscription_links"
 
             if [ -z "$selector_proxy_links" ]; then
-                log "URLTest proxy links is not set. Aborted." "fatal"
+                log "Selector proxy links and subscription URLs are not set. Aborted." "fatal"
                 exit 1
             fi
 
+            case "$-" in
+            *f*) old_noglob=1 ;;
+            *) old_noglob=0 ;;
+            esac
+            set -f
             i=1
             for link in $selector_proxy_links; do
                 config="$(sing_box_cf_add_proxy_outbound "$config" "$section-$i" "$link" "$udp_over_tcp")"
@@ -672,6 +713,7 @@ configure_outbound_handler() {
                 fi
                 i=$((i + 1))
             done
+            [ "$old_noglob" = "1" ] || set +f
 
             selector_tag="$(get_outbound_tag_by_section "$section")"
             selector_outbounds="$(comma_string_to_json_array "$outbound_tags")"
@@ -680,10 +722,11 @@ configure_outbound_handler() {
             ;;
         urltest)
             log "Detected proxy configuration type: urltest" "debug"
-            local urltest_proxy_links udp_over_tcp i urltest_tag selector_tag outbound_tag outbound_tags \
+            local urltest_proxy_links urltest_subscription_urls subscription_links udp_over_tcp i urltest_tag selector_tag outbound_tag outbound_tags old_noglob \
                 urltest_outbounds selector_outbounds urltest_check_interval urltest_tolerance urltest_testing_url \
                 urltest_fallback_links fallback_tags urltest_fallbacks urltest_download_check urltest_download_url
             config_get urltest_proxy_links "$section" "urltest_proxy_links"
+            config_get urltest_subscription_urls "$section" "urltest_subscription_urls"
             config_get urltest_fallback_links "$section" "urltest_fallback_links"
             config_get udp_over_tcp "$section" "enable_udp_over_tcp"
             config_get urltest_check_interval "$section" "urltest_check_interval" "3m"
@@ -691,6 +734,8 @@ configure_outbound_handler() {
             config_get urltest_testing_url "$section" "urltest_testing_url" "https://www.gstatic.com/generate_204"
             config_get urltest_download_check "$section" "urltest_download_check" "default"
             config_get urltest_download_url "$section" "urltest_download_url"
+            subscription_links="$(subscription_cached_links "$section" urltest "$urltest_subscription_urls")"
+            urltest_proxy_links="$urltest_proxy_links $subscription_links"
 
             if [ -z "$urltest_proxy_links" ]; then
                 log "URLTest proxy links is not set. Aborted." "fatal"
@@ -707,6 +752,11 @@ configure_outbound_handler() {
                 urltest_download_check="default"
             fi
 
+            case "$-" in
+            *f*) old_noglob=1 ;;
+            *) old_noglob=0 ;;
+            esac
+            set -f
             i=1
             for link in $urltest_proxy_links; do
                 config="$(sing_box_cf_add_proxy_outbound "$config" "$section-$i" "$link" "$udp_over_tcp")"
@@ -730,6 +780,7 @@ configure_outbound_handler() {
                 fi
                 i=$((i + 1))
             done
+            [ "$old_noglob" = "1" ] || set +f
 
             urltest_tag="$(get_outbound_tag_by_section "$section-urltest")"
             selector_tag="$(get_outbound_tag_by_section "$section")"
@@ -848,6 +899,16 @@ sing_box_configure_route() {
     config_get_bool disable_quic "settings" "disable_quic" 0
     if [ "$disable_quic" -eq 1 ]; then
         config=$(sing_box_cf_add_single_key_reject_rule "$config" "$SB_TPROXY_INBOUND_TAG" "protocol" "quic")
+    fi
+
+    local bypass_bittorrent_traffic bittorrent_rule_tag
+    config_get_bool bypass_bittorrent_traffic "settings" "bypass_bittorrent_traffic" "0"
+    if [ "$bypass_bittorrent_traffic" -eq 1 ]; then
+        bittorrent_rule_tag="$(gen_id)"
+        config=$(sing_box_cm_add_route_rule "$config" "$bittorrent_rule_tag" "$SB_TPROXY_INBOUND_TAG" \
+            "$SB_DIRECT_OUTBOUND_TAG")
+        config=$(sing_box_cm_patch_route_rule "$config" "$bittorrent_rule_tag" "protocol" '["bittorrent"]')
+        log "Detected BitTorrent peer traffic will bypass section routing rules"
     fi
 
     local first_outbound_section
@@ -1647,7 +1708,7 @@ get_service_listen_address() {
     network_get_ipaddr service_listen_address "$interface"
 
     if [ -z "$service_listen_address" ]; then
-        log "Failed to determine the listening IP address. Please open an issue to report this problem: https://github.com/itdoginfo/podkop/issues" "error"
+        log "Failed to determine the listening IP address. Please open an issue to report this problem: https://github.com/19man91-ops/podforkop/issues" "error"
         return 1
     fi
 
@@ -1887,8 +1948,10 @@ show_config() {
     sed -e 's/\(option proxy_string\).*/\1 '\''MASKED'\''/g' \
         -e '/option outbound_json/,/^}/c\	option outbound_json '\''MASKED'\''' \
         -e 's/\(list urltest_proxy_links\).*/\1 '\''MASKED'\''/g' \
+        -e 's/\(list urltest_subscription_urls\).*/\1 '\''MASKED'\''/g' \
         -e 's/\(list urltest_fallback_links\).*/\1 '\''MASKED'\''/g' \
         -e 's/\(list selector_proxy_links\).*/\1 '\''MASKED'\''/g' \
+        -e 's/\(list selector_subscription_urls\).*/\1 '\''MASKED'\''/g' \
         -e "s@\\(option dns_server '[^/]*\\)/[^']*'@\\1/MASKED'@g" \
         -e "s@\\(option domain_resolver_dns_server '[^/]*\\)/[^']*'@\\1/MASKED'@g" \
         -e 's/\(option yacd_secret_key\).*/\1 '\''MASKED'\''/g' \
@@ -1926,7 +1989,7 @@ get_system_info() {
 
     podkop_version="$PODKOP_VERSION"
 
-    podkop_latest_version=$(curl -m 3 -s https://api.github.com/repos/itdoginfo/podkop/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
+    podkop_latest_version=$(curl -m 3 -s https://api.github.com/repos/19man91-ops/podforkop/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
     [ -z "$podkop_latest_version" ] && podkop_latest_version="unknown"
 
     if [ -f /www/luci-static/resources/view/podkop/main.js ]; then
@@ -2709,6 +2772,7 @@ Available commands:
     restart                 Restart podkop service
     main                    Run main podkop process
     list_update             Update domain lists
+    subscription_update     Update proxy subscriptions
     check_proxy             Check proxy connectivity
     check_nft               Check NFT rules
     check_nft_rules         Check NFT rules status
@@ -2749,6 +2813,9 @@ main)
     ;;
 list_update)
     list_update
+    ;;
+subscription_update)
+    subscription_update
     ;;
 check_proxy)
     check_proxy

@@ -1,6 +1,6 @@
-# Podkop
+# PodForkop
 
-Маршрутизация трафика для OpenWrt.
+Форк [Podkop](https://github.com/itdoginfo/podkop) для маршрутизации трафика в OpenWrt с подписками на прокси и обходом секций для BitTorrent.
 
 Направляйте нужные ресурсы в туннель, а остальное — напрямую. Открытое программное обеспечение на базе [sing-box](https://github.com/SagerNet/sing-box).
 
@@ -23,6 +23,14 @@
 - Если установлен Getdomains, его [необходимо удалить](https://github.com/itdoginfo/domain-routing-openwrt?tab=readme-ov-file#скрипт-для-удаления)
 - Dashboard доступен только при подключении по HTTP (из-за особенностей Clash API). При использовании HTTPS или домена работа может быть недоступна.
 
+### Подписки на прокси
+
+В секциях **Selector** и **URLTest** можно добавить HTTP(S)-адрес подписки в поля **Selector Subscription URLs** или **URLTest Subscription URLs**. Поддерживаются подписки в виде обычного списка ссылок и Base64-списка URI VLESS, Trojan, Shadowsocks, SOCKS4/5 и Hysteria2. Интервал обновления задаётся общей настройкой **List and Subscription Update Frequency**. Если загрузка не удалась, текущий кэш подписки не перезаписывается.
+
+### Прямой маршрут для BitTorrent
+
+В общих настройках включите **Bypass sections for BitTorrent traffic**, чтобы распознанные BitTorrent-соединения между узлами и DHT шли напрямую до применения правил секций. HTTP(S)-запросы к трекерам не распознаются как P2P-соединения.
+
 ### Поддержка и диагностика
 - [Руководство по диагностике](https://podkop.net/docs/diagnostics/)
 - Актуальные изменения публикуются в [Telegram-чате](https://t.me/itdogchat/81758/420321). Пожалуйста, ознакомьтесь с закрепленными сообщениями.
@@ -32,12 +40,12 @@
 # Документация
 https://podkop.net/
 
-# Установка Podkop
+# Установка PodForkop
 Полное руководство доступно в [документации](https://podkop.net/docs/install/)
 
 Для установки и обновления достаточно выполнить один скрипт:
 ```
-sh <(wget -O - https://raw.githubusercontent.com/itdoginfo/podkop/refs/heads/main/install.sh)
+sh <(wget -O - https://raw.githubusercontent.com/19man91-ops/podforkop/main/install.sh)
 ```
 
 Часть возможностей Podkop (например, ссылки с транспортом xhttp и резервные ссылки в URLTest) работает только с альтернативной сборкой sing-box — [podkop-engine](https://github.com/FiyeroT/podkop-engine) версии r11 или новее. С обычным sing-box эти возможности недоступны, остальное работает как раньше.
@@ -60,4 +68,4 @@ wget -O - https://mirror.podkop.net/urjw/scripts/bootstrap.sh | sh
 > 
 > Правообладатели и участники проекта не несут ответственности за любые прямые, косвенные, случайные, специальные или иные убытки, возникшие в результате использования программного обеспечения, включая потерю данных, прибыли или прерывание деятельности, даже если они были предупреждены о возможности таких последствий.
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/itdoginfo/podkop)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/19man91-ops/podforkop)

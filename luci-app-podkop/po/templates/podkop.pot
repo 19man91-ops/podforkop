@@ -360,6 +360,14 @@ msgstr ""
 msgid "Exclude NTP protocol traffic from the tunnel to prevent it from being routed through the proxy or VPN"
 msgstr ""
 
+#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/settings.js:425
+msgid "Bypass sections for BitTorrent traffic"
+msgstr ""
+
+#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/settings.js:426
+msgid "Route detected BitTorrent peer and DHT traffic directly before section rules. HTTP(S) tracker requests are not detected as BitTorrent traffic."
+msgstr ""
+
 #: src/helpers/copyToClipboard.ts:12
 msgid "Failed to copy!"
 msgstr ""
@@ -597,7 +605,7 @@ msgid "Latest"
 msgstr ""
 
 #: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/settings.js:287
-msgid "List Update Frequency"
+msgid "List and Subscription Update Frequency"
 msgstr ""
 
 #: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:611
@@ -811,7 +819,7 @@ msgid "Select DNS protocol to use"
 msgstr ""
 
 #: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/settings.js:288
-msgid "Select how often the domain or subnet lists are updated automatically"
+msgid "Select how often domain, subnet, and proxy subscription data are updated automatically"
 msgstr ""
 
 #: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:24
@@ -869,6 +877,15 @@ msgstr ""
 
 #: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:88
 msgid "Selector Proxy Links"
+msgstr ""
+
+#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:112
+msgid "Selector Subscription URLs"
+msgstr ""
+
+#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:114
+#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:152
+msgid "HTTP(S) subscription links returning proxy URLs; refreshed using the global list update frequency"
 msgstr ""
 
 #: src/podkop/tabs/dashboard/initController.ts:340
@@ -1060,6 +1077,10 @@ msgstr ""
 
 #: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:111
 msgid "URLTest Proxy Links"
+msgstr ""
+
+#: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:150
+msgid "URLTest Subscription URLs"
 msgstr ""
 
 #: ../luci-app-podkop/htdocs/luci-static/resources/view/podkop/section.js:194

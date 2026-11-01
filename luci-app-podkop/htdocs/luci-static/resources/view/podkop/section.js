@@ -5,6 +5,21 @@
 "require tools.widgets as widgets";
 "require view.podkop.main as main";
 
+function validateSubscriptionUrl(value) {
+  if (!value || value.length === 0) {
+    return true;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.hostname && ["http:", "https:"].includes(url.protocol)
+      ? true
+      : _("Invalid URL format");
+  } catch {
+    return _("Invalid URL format");
+  }
+}
+
 function createSectionContent(section, singBoxFeatures = []) {
   let o = section.option(
     form.ListValue,
@@ -107,6 +122,17 @@ function createSectionContent(section, singBoxFeatures = []) {
 
   o = section.option(
     form.DynamicList,
+    "selector_subscription_urls",
+    _("Selector Subscription URLs"),
+    _("HTTP(S) subscription links returning proxy URLs; refreshed using the global list update frequency"),
+  );
+  o.depends("proxy_config_type", "selector");
+  o.validate = function (_section_id, value) {
+    return validateSubscriptionUrl(value);
+  };
+
+  o = section.option(
+    form.DynamicList,
     "urltest_proxy_links",
     _("URLTest Proxy Links"),
     _("vless://, ss://, trojan://, socks4/5://, hy2/hysteria2:// links")
@@ -126,6 +152,17 @@ function createSectionContent(section, singBoxFeatures = []) {
     }
 
     return validation.message;
+  };
+
+  o = section.option(
+    form.DynamicList,
+    "urltest_subscription_urls",
+    _("URLTest Subscription URLs"),
+    _("HTTP(S) subscription links returning proxy URLs; refreshed using the global list update frequency"),
+  );
+  o.depends("proxy_config_type", "urltest");
+  o.validate = function (_section_id, value) {
+    return validateSubscriptionUrl(value);
   };
 
   if (singBoxFeatures.includes("urltest.fallbacks")) {

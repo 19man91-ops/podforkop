@@ -284,8 +284,8 @@ function createSettingsContent(section, singBoxFeatures = []) {
   o = section.option(
     form.ListValue,
     "update_interval",
-    _("List Update Frequency"),
-    _("Select how often the domain or subnet lists are updated automatically"),
+    _("List and Subscription Update Frequency"),
+    _("Select how often domain, subnet, and proxy subscription data are updated automatically"),
   );
   Object.entries(main.UPDATE_INTERVAL_OPTIONS).forEach(([key, label]) => {
     o.value(key, _(label));
@@ -413,6 +413,17 @@ function createSettingsContent(section, singBoxFeatures = []) {
     _("Exclude NTP"),
     _(
       "Exclude NTP protocol traffic from the tunnel to prevent it from being routed through the proxy or VPN",
+    ),
+  );
+  o.default = "0";
+  o.rmempty = false;
+
+  o = section.option(
+    form.Flag,
+    "bypass_bittorrent_traffic",
+    _("Bypass sections for BitTorrent traffic"),
+    _(
+      "Route detected BitTorrent peer and DHT traffic directly before section rules. HTTP(S) tracker requests are not detected as BitTorrent traffic.",
     ),
   );
   o.default = "0";

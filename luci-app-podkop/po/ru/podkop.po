@@ -263,6 +263,12 @@ msgstr "Исключить NTP"
 msgid "Exclude NTP protocol traffic from the tunnel to prevent it from being routed through the proxy or VPN"
 msgstr "Исключите трафик протокола NTP из туннеля, чтобы предотвратить его маршрутизацию через прокси-сервер или VPN."
 
+msgid "Bypass sections for BitTorrent traffic"
+msgstr "Обходить секции для BitTorrent-трафика"
+
+msgid "Route detected BitTorrent peer and DHT traffic directly before section rules. HTTP(S) tracker requests are not detected as BitTorrent traffic."
+msgstr "Направлять распознанные соединения BitTorrent между узлами и DHT напрямую перед правилами секций. HTTP(S)-запросы к трекерам не распознаются как BitTorrent-трафик."
+
 msgid "Failed to copy!"
 msgstr "Не удалось скопировать!"
 
@@ -434,8 +440,8 @@ msgstr "Обнаружены проблемы"
 msgid "Latest"
 msgstr "Последняя"
 
-msgid "List Update Frequency"
-msgstr "Частота обновления списков"
+msgid "List and Subscription Update Frequency"
+msgstr "Частота обновления списков и подписок"
 
 msgid "Local Domain Lists"
 msgstr "Локальные списки доменов"
@@ -587,8 +593,8 @@ msgstr "Выберите между VPN и Proxy методами для мар�
 msgid "Select DNS protocol to use"
 msgstr "Выберите протокол DNS"
 
-msgid "Select how often the domain or subnet lists are updated automatically"
-msgstr "Выберите частоту автоматического обновления списков доменов или подсетей."
+msgid "Select how often domain, subnet, and proxy subscription data are updated automatically"
+msgstr "Выберите частоту автоматического обновления списков доменов, подсетей и прокси-подписок."
 
 msgid "Select how to configure the proxy"
 msgstr "Выберите способ настройки прокси"
@@ -631,6 +637,12 @@ msgstr "Selector"
 
 msgid "Selector Proxy Links"
 msgstr "Ссылки прокси для Selector"
+
+msgid "Selector Subscription URLs"
+msgstr "Ссылки на подписки для Selector"
+
+msgid "HTTP(S) subscription links returning proxy URLs; refreshed using the global list update frequency"
+msgstr "HTTP(S)-ссылки на подписки со списком прокси; обновляются с общей частотой обновления списков"
 
 msgid "Services info"
 msgstr "Информация о сервисах"
@@ -766,6 +778,9 @@ msgstr "Интервал проверки URLTest"
 
 msgid "URLTest Proxy Links"
 msgstr "Ссылки прокси для URLTest"
+
+msgid "URLTest Subscription URLs"
+msgstr "Ссылки на подписки для URLTest"
 
 msgid "URLTest Testing URL"
 msgstr "URLTest ссылка для проверки"
