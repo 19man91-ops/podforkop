@@ -22,16 +22,21 @@ pkg_is_installed () {
     local pkg_name="$1"
 
     if [ "$PKG_IS_APK" -eq 1 ]; then
-        # grep -q should work without change based on example from documentation
-        # apk list --installed --providers dnsmasq
-        # <dnsmasq> dnsmasq-full-2.90-r3 x86_64 {feeds/base/package/network/services/dnsmasq} (GPL-2.0) [installed]
-        apk list --installed | awk -v package="$pkg_name" '
+        if apk info -e "$pkg_name" >/dev/null 2>&1; then
+            return 0
+        fi
+        if [ -f /etc/apk/world ] && grep -qx "$pkg_name" /etc/apk/world 2>/dev/null; then
+            return 0
+        fi
+        apk list --installed 2>/dev/null | awk -v package="$pkg_name" '
             {
-                name = $1
-                sub(/^</, "", name)
-                sub(/>$/, "", name)
-                sub(/-[0-9].*$/, "", name)
-                if (name == package) found = 1
+                for (i = 1; i <= NF; i++) {
+                    name = $i
+                    sub(/^</, "", name)
+                    sub(/>$/, "", name)
+                    sub(/-[0-9].*$/, "", name)
+                    if (name == package) { found = 1; exit }
+                }
             }
             END { exit !found }
         '
@@ -44,9 +49,7 @@ pkg_remove() {
     local pkg_name="$1"
 
     if [ "$PKG_IS_APK" -eq 1 ]; then
-        # TODO: check --force-depends flag
-        # Nothing here: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
-        apk del "$pkg_name"
+        apk del "$pkg_name" >/dev/null 2>&1 || true
     else
         opkg remove --force-depends "$pkg_name"
     fi
@@ -216,7 +219,7 @@ main() {
     if [ -n "$ru" ]; then
         if pkg_is_installed luci-i18n-podkop-ru; then
                 msg "Upgrading Russian translation..."
-                pkg_remove luci-i18n-podkop*
+                pkg_remove luci-i18n-podkop-ru
                 pkg_install "$DOWNLOAD_DIR/$ru"
         else
             msg "Русский язык интерфейса ставим? y/n (Install the Russian interface language?)"
@@ -224,7 +227,7 @@ main() {
                 read -r -p '' RUS
                 case $RUS in
                 y)
-                    pkg_remove luci-i18n-podkop*
+                    pkg_remove luci-i18n-podkop-ru
                     pkg_install "$DOWNLOAD_DIR/$ru"
                     break
                     ;;
@@ -345,27 +348,37 @@ install_podkop_engine() {
         exit 1
     fi
 
+    service podkop stop >/dev/null 2>&1 || true
     if [ "$PKG_IS_APK" -eq 0 ]; then
-        if [ -n "$installed_engine_package" ]; then
-            msg "Replacing $installed_engine_package with $engine_package..."
-            service podkop stop >/dev/null 2>&1 || true
-            opkg remove --force-depends "$installed_engine_package" || {
-                msg "Could not remove the previous podkop-engine package."
-                exit 1
-            }
-        else
-            msg "Replacing the OpenWrt sing-box package with $engine_package..."
-            service podkop stop >/dev/null 2>&1 || true
-            opkg remove --force-depends sing-box sing-box-tiny >/dev/null 2>&1 || true
-        fi
+        for package in sing-box-forkop sing-box sing-box-tiny podkop-engine podkop-engine-full; do
+            if [ "$package" != "$engine_package" ] && pkg_is_installed "$package"; then
+                msg "Replacing $package with $engine_package..."
+                opkg remove --force-depends "$package" >/dev/null 2>&1 || true
+            fi
+        done
     fi
 
     msg "Installing $filename..."
-    if [ "$PKG_IS_APK" -eq 1 ] && [ -n "$installed_engine_package" ] \
-        && [ "$installed_engine_package" != "$engine_package" ]; then
-        if ! apk add --allow-untrusted "$filepath" "!$installed_engine_package"; then
-            msg "Could not install podkop-engine. Check available flash space and package-manager output."
-            exit 1
+    if [ "$PKG_IS_APK" -eq 1 ]; then
+        local apk_conflicts=""
+        for package in sing-box-forkop sing-box sing-box-tiny podkop-engine podkop-engine-full; do
+            if [ "$package" != "$engine_package" ]; then
+                if pkg_is_installed "$package" || ([ -f /etc/apk/world ] && grep -qx "$package" /etc/apk/world 2>/dev/null); then
+                    msg "Replacing $package with $engine_package..."
+                    apk_conflicts="$apk_conflicts !$package"
+                fi
+            fi
+        done
+        # shellcheck disable=SC2086
+        if ! apk add --allow-untrusted "$filepath" $apk_conflicts; then
+            msg "Retrying $engine_package install with explicit conflict removal..."
+            for package in sing-box-forkop sing-box sing-box-tiny podkop-engine podkop-engine-full; do
+                [ "$package" = "$engine_package" ] || apk del "$package" >/dev/null 2>&1 || true
+            done
+            if ! apk add --allow-untrusted "$filepath"; then
+                msg "Could not install podkop-engine. Check available flash space and package-manager output."
+                exit 1
+            fi
         fi
     elif ! pkg_install "$filepath"; then
         msg "Could not install podkop-engine. Check available flash space and package-manager output."
@@ -466,9 +479,21 @@ install_sing_box_forkop() {
 
     msg "Installing $filename..."
     if [ "$PKG_IS_APK" -eq 1 ]; then
-        if ! apk add --allow-untrusted "$filepath"; then
-            msg "Could not install sing-box-forkop. Check available flash space and package-manager output."
-            exit 1
+        local apk_conflicts=""
+        for package in podkop-engine podkop-engine-full sing-box sing-box-tiny; do
+            if pkg_is_installed "$package" || ([ -f /etc/apk/world ] && grep -qx "$package" /etc/apk/world 2>/dev/null); then
+                msg "Replacing $package with sing-box-forkop..."
+                apk_conflicts="$apk_conflicts !$package"
+            fi
+        done
+        # shellcheck disable=SC2086
+        if ! apk add --allow-untrusted "$filepath" $apk_conflicts; then
+            msg "Retrying sing-box-forkop install with explicit conflict removal..."
+            apk del podkop-engine podkop-engine-full sing-box sing-box-tiny >/dev/null 2>&1 || true
+            if ! apk add --allow-untrusted "$filepath"; then
+                msg "Could not install sing-box-forkop. Check available flash space and package-manager output."
+                exit 1
+            fi
         fi
     elif ! pkg_install "$filepath"; then
         msg "Could not install sing-box-forkop. Check available flash space and package-manager output."
