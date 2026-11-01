@@ -357,7 +357,7 @@ install_podkop_engine() {
 }
 
 get_reclaimable_space_kb() {
-    local package installed_size reclaimable_space_kb
+    local package installed_size reclaimable_space_kb package_control
 
     reclaimable_space_kb=0
     for package in sing-box sing-box-tiny podkop-engine podkop-engine-full; do
@@ -367,16 +367,51 @@ get_reclaimable_space_kb() {
 
         if [ "$PKG_IS_APK" -eq 1 ]; then
             installed_size=$(apk info -s "$package" 2>/dev/null \
-                | sed -n 's/.*installed size: *\([0-9.][0-9.]*\) *\([KM]iB\).*/\1 \2/p' \
-                | awk '$2 == "MiB" { printf "%.0f", $1 * 1024 } $2 == "KiB" { printf "%.0f", $1 }' \
-                | head -n 1)
+                | awk '
+                    function to_kib(value, unit) {
+                        if (unit == "mib") return value * 1024
+                        if (unit == "gib") return value * 1048576
+                        if (unit == "kib") return value
+                        if (unit == "kb") return value * 1000 / 1024
+                        if (unit == "mb") return value * 1000000 / 1024
+                        if (unit == "gb") return value * 1000000000 / 1024
+                        return int((value + 1023) / 1024)
+                    }
+                    tolower($0) ~ /installed size:/ {
+                        size_line = $0
+                        sub(/^.*installed size:[[:space:]]*/, "", size_line)
+                        if (size_line == "" && getline > 0) size_line = $0
+                        count = split(size_line, size_fields, /[[:space:]]+/)
+                        value = size_fields[1]
+                        unit = tolower(size_fields[2])
+                        if (value ~ /^[0-9]+([.][0-9]+)?$/) {
+                            printf "%.0f", to_kib(value, unit)
+                            exit
+                        }
+                    }
+                ')
             case "$installed_size" in
                 ''|*[!0-9]*) continue ;;
             esac
             reclaimable_space_kb=$((reclaimable_space_kb + installed_size))
         else
             installed_size=$(opkg status "$package" 2>/dev/null \
-                | awk -F ': ' '$1 == "Installed-Size" { print $2; exit }')
+                | awk -F ':' '$1 == "Installed-Size" { gsub(/[[:space:]]/, "", $2); print $2; exit }')
+            if [ -z "$installed_size" ]; then
+                package_control="/usr/lib/opkg/info/$package.control"
+                if [ -r "$package_control" ]; then
+                    installed_size=$(awk -F ':' '$1 == "Installed-Size" { gsub(/[[:space:]]/, "", $2); print $2; exit }' "$package_control")
+                fi
+            fi
+            if [ -z "$installed_size" ] && pkg_is_installed "$package"; then
+                # Some vendor firmware omits Installed-Size from opkg metadata.
+                # Count only files that are actually in overlay's writable upperdir.
+                installed_size=$(du -sk \
+                    /overlay/upper/usr/bin/sing-box \
+                    /overlay/upper/etc/init.d/sing-box \
+                    /overlay/upper/etc/config/sing-box 2>/dev/null \
+                    | awk '{ total += $1 } END { if (total) printf "%.0f", total * 1024 }')
+            fi
             case "$installed_size" in
                 ''|*[!0-9]*) continue ;;
             esac
