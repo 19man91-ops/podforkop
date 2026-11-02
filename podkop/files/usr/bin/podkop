@@ -191,11 +191,20 @@ stop_main() {
     /etc/init.d/sing-box stop
 }
 
+# Hash the desired UCI config, excluding transient options that Podkop itself
+# changes during start/stop (shutdown_correctly). This keeps the "applied"
+# marker stable across restarts and avoids false stale states.
+podkop_config_state_hash() {
+    command -v sha256sum > /dev/null 2>&1 || return 1
+    uci show podkop 2> /dev/null |
+        grep -v '^podkop\.settings\.shutdown_correctly=' |
+        sha256sum | awk '{print $1}'
+}
+
 podkop_save_applied_state() {
     local uci_hash
 
-    command -v sha256sum > /dev/null 2>&1 || return 0
-    uci_hash=$(sha256sum /etc/config/podkop 2> /dev/null | awk '{print $1}')
+    uci_hash="$(podkop_config_state_hash)" || return 0
     [ -n "$uci_hash" ] && echo "$uci_hash" > /var/run/podkop-applied
 }
 
@@ -3560,7 +3569,7 @@ get_config_status() {
     # the last successful start/reload. Mtime alone produces false positives
     # when the generated config is unchanged.
     if command -v sha256sum > /dev/null 2>&1; then
-        uci_hash=$(sha256sum "$uci_file" 2> /dev/null | awk '{print $1}')
+        uci_hash="$(podkop_config_state_hash)"
         applied_hash=$(cat /var/run/podkop-applied 2> /dev/null || true)
         [ -n "$uci_hash" ] && [ "$uci_hash" = "$applied_hash" ] || stale=1
     else
