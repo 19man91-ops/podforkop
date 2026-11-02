@@ -191,6 +191,14 @@ stop_main() {
     /etc/init.d/sing-box stop
 }
 
+podkop_save_applied_state() {
+    local uci_hash
+
+    command -v sha256sum > /dev/null 2>&1 || return 0
+    uci_hash=$(sha256sum /etc/config/podkop 2> /dev/null | awk '{print $1}')
+    [ -n "$uci_hash" ] && echo "$uci_hash" > /var/run/podkop-applied
+}
+
 start() {
     start_main
 
@@ -205,6 +213,8 @@ start() {
         uci_set "podkop" "settings" "shutdown_correctly" 0
         uci commit "podkop" && config_load "$PODKOP_CONFIG"
     fi
+
+    podkop_save_applied_state
 }
 
 stop() {
@@ -222,12 +232,15 @@ stop() {
         uci_set "podkop" "settings" "shutdown_correctly" 1
         uci commit "podkop" && config_load "$PODKOP_CONFIG"
     fi
+
+    podkop_save_applied_state
 }
 
 reload() {
     log "Podkop reload"
     stop_main
     start_main
+    podkop_save_applied_state
 }
 
 restart() {
@@ -3536,31 +3549,39 @@ update_to_latest() {
 
 get_config_status() {
     local config_path config_file uci_file uci_mtime config_mtime stale=0
+    local uci_hash applied_hash
 
     config_get config_path "settings" "config_path"
     [ -n "$config_path" ] || config_path="/etc/sing-box/config.json"
     config_file="$config_path"
     uci_file="/etc/config/podkop"
 
-    # OpenWrt's BusyBox may not include "stat"; "date -r" is available in
-    # BusyBox and gives the mtime in seconds. Fall back to test -nt.
-    uci_mtime=$(date -r "$uci_file" +%s 2> /dev/null || echo 0)
-    config_mtime=$(date -r "$config_file" +%s 2> /dev/null || echo 0)
-
-    case "$uci_mtime" in '' | *[!0-9]*) uci_mtime=0 ;; esac
-    case "$config_mtime" in '' | *[!0-9]*) config_mtime=0 ;; esac
-
-    if [ "$uci_mtime" -gt 0 ] && [ "$config_mtime" -gt 0 ]; then
-        [ "$uci_mtime" -gt "$config_mtime" ] && stale=1
-    elif [ "$uci_file" -nt "$config_file" ]; then
-        stale=1
+    # The authoritative signal is the hash of /etc/config/podkop written by
+    # the last successful start/reload. Mtime alone produces false positives
+    # when the generated config is unchanged.
+    if command -v sha256sum > /dev/null 2>&1; then
+        uci_hash=$(sha256sum "$uci_file" 2> /dev/null | awk '{print $1}')
+        applied_hash=$(cat /var/run/podkop-applied 2> /dev/null || true)
+        [ -n "$uci_hash" ] && [ "$uci_hash" = "$applied_hash" ] || stale=1
+    else
+        uci_mtime=$(date -r "$uci_file" +%s 2> /dev/null || echo 0)
+        config_mtime=$(date -r "$config_file" +%s 2> /dev/null || echo 0)
+        case "$uci_mtime" in '' | *[!0-9]*) uci_mtime=0 ;; esac
+        case "$config_mtime" in '' | *[!0-9]*) config_mtime=0 ;; esac
+        if [ "$uci_mtime" -gt 0 ] && [ "$config_mtime" -gt 0 ]; then
+            [ "$uci_mtime" -gt "$config_mtime" ] && stale=1
+        elif [ "$uci_file" -nt "$config_file" ]; then
+            stale=1
+        fi
     fi
 
-    jq -n --argjson stale "$stale" --argjson uci_mtime "$uci_mtime" --argjson config_mtime "$config_mtime" '{
-        stale: ($stale == 1),
-        uci_mtime: $uci_mtime,
-        config_mtime: $config_mtime
-    }'
+    jq -n         --argjson stale "$stale"         --argjson uci_mtime "$uci_mtime"         --argjson config_mtime "$config_mtime"         --arg uci_hash "${uci_hash:-}"         --arg applied_hash "${applied_hash:-}"         '{
+            stale: ($stale == 1),
+            uci_mtime: $uci_mtime,
+            config_mtime: $config_mtime,
+            uci_hash: $uci_hash,
+            applied_hash: $applied_hash
+        }'
 }
 
 show_help() {
