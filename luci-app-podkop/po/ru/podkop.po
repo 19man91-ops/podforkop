@@ -1236,3 +1236,46 @@ msgstr "После изменения секции нажмите Save & Apply �
 msgid "Failed to restart Podkop service. The changes are saved; run service podkop restart manually."
 msgstr "Не удалось перезапустить Podkop. Изменения сохранены; выполните service podkop restart вручную."
 
+
+msgid "A new version is available: {from} → {to}. PodForCOP will download the official packages, verify their SHA256 checksums, install them and restart the service."
+msgstr "Доступна новая версия: {from} → {to}. PodForCOP скачает официальные пакеты, проверит их SHA256, установит и перезапустит службу."
+
+msgid "Downloading and installing the update. This can take a few minutes. Do not close this page."
+msgstr "Скачивание и установка обновления. Это может занять несколько минут. Не закрывайте страницу."
+
+msgid "No output"
+msgstr "Нет вывода"
+
+msgid "Please wait..."
+msgstr "Пожалуйста, подождите..."
+
+msgid "PodForCOP has been updated. Reload the page to use the new interface."
+msgstr "PodForCOP обновлён. Перезагрузите страницу, чтобы использовать новый интерфейс."
+
+msgid "Reload page"
+msgstr "Перезагрузить страницу"
+
+msgid "The update failed. Check the output below."
+msgstr "Обновление не удалось. Проверьте вывод ниже."
+
+msgid "The update failed. The output below may help to diagnose the problem."
+msgstr "Обновление не удалось. Вывод ниже может помочь диагностировать проблему."
+
+msgid "Update"
+msgstr "Обновить"
+
+msgid "Update completed"
+msgstr "Обновление завершено"
+
+msgid "Update failed"
+msgstr "Ошибка обновления"
+
+msgid "Update PodForCOP"
+msgstr "Обновить PodForCOP"
+
+msgid "Updating PodForCOP"
+msgstr "Обновление PodForCOP"
+
+msgid "Your settings and sections are kept. The service will be restarted after the update."
+msgstr "Ваши настройки и секции сохранятся. После обновления служба будет перезапущена."
+

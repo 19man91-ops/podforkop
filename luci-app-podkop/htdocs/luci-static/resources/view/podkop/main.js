@@ -700,6 +700,7 @@ var Podkop;
     AvailableMethods2["ADD_DOMAIN_EXCLUSION"] = "add_domain_exclusion";
     AvailableMethods2["TELEGRAM_TEST"] = "telegram_test";
     AvailableMethods2["PRIVACY_TEST"] = "privacy_test";
+    AvailableMethods2["UPDATE_TO_LATEST"] = "update_to_latest";
   })(AvailableMethods = Podkop2.AvailableMethods || (Podkop2.AvailableMethods = {}));
   let AvailableClashAPIMethods;
   ((AvailableClashAPIMethods2) => {
@@ -819,6 +820,12 @@ var PodkopShellMethods = {
     [],
     "/usr/bin/podkop",
     2e4
+  ),
+  updateToLatest: async () => callBaseMethod(
+    Podkop.AvailableMethods.UPDATE_TO_LATEST,
+    [],
+    "/usr/bin/podkop",
+    6e5
   ),
   privacyTest: async () => callBaseMethod(
     Podkop.AvailableMethods.PRIVACY_TEST,
@@ -1519,6 +1526,9 @@ var initialDiagnosticStore = {
       loading: false
     },
     privacyTest: {
+      loading: false
+    },
+    update: {
       loading: false
     }
   },
@@ -3964,7 +3974,6 @@ function render2() {
       })
     ]),
     E("div", { class: "pdk_diagnostic-page__right-bar" }, [
-      E("div", { id: "pdk_diagnostic-page-wiki" }),
       E("div", { id: "pdk_diagnostic-page-actions" }),
       E("div", { id: "pdk_diagnostic-page-system-info" })
     ])
@@ -4857,34 +4866,6 @@ function renderChevronUpIcon24() {
   );
 }
 
-// src/icons/renderBookOpenTextIcon24.ts
-function renderBookOpenTextIcon24() {
-  const NS = "http://www.w3.org/2000/svg";
-  return svgEl(
-    "svg",
-    {
-      xmlns: NS,
-      viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: "currentColor",
-      "stroke-width": "2",
-      "stroke-linecap": "round",
-      "stroke-linejoin": "round",
-      class: "lucide lucide-book-open-text-icon lucide-book-open-text"
-    },
-    [
-      svgEl("path", { d: "M12 7v14" }),
-      svgEl("path", { d: "M16 12h2" }),
-      svgEl("path", { d: "M16 8h2" }),
-      svgEl("path", {
-        d: "M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
-      }),
-      svgEl("path", { d: "M6 12h2" }),
-      svgEl("path", { d: "M6 8h2" })
-    ]
-  );
-}
-
 // src/partials/button/renderButton.ts
 function renderButton({
   classNames = [],
@@ -4994,10 +4975,21 @@ function renderAvailableActions({
   globalCheck,
   viewLogs,
   showSingBoxConfig,
-  privacyTest
+  privacyTest,
+  update
 }) {
   return E("div", { class: "pdk_diagnostic-page__right-bar__actions" }, [
     E("b", {}, _("Available actions")),
+    ...insertIf(update.visible, [
+      renderButton({
+        classNames: ["cbi-button-save"],
+        onClick: update.onClick,
+        icon: renderRotateCcwIcon24,
+        text: _("Update PodForCOP"),
+        loading: update.loading,
+        disabled: update.disabled
+      })
+    ]),
     ...insertIf(restart.visible, [
       renderButton({
         classNames: ["cbi-button-apply"],
@@ -5299,41 +5291,6 @@ function normalizeCompiledVersion(version) {
   return version;
 }
 
-// src/podkop/tabs/diagnostic/partials/renderWikiDisclaimer.ts
-function renderWikiDisclaimer(kind) {
-  const iconWrap = E("span", {
-    class: "pdk_diagnostic-page__right-bar__wiki__icon"
-  });
-  iconWrap.appendChild(renderBookOpenTextIcon24());
-  const className = [
-    "pdk_diagnostic-page__right-bar__wiki",
-    ...insertIf(kind === "error", [
-      "pdk_diagnostic-page__right-bar__wiki--error"
-    ]),
-    ...insertIf(kind === "warning", [
-      "pdk_diagnostic-page__right-bar__wiki--warning"
-    ])
-  ].join(" ");
-  return E("div", { class: className }, [
-    E("div", { class: "pdk_diagnostic-page__right-bar__wiki__content" }, [
-      iconWrap,
-      E("div", { class: "pdk_diagnostic-page__right-bar__wiki__texts" }, [
-        E("b", {}, _("Troubleshooting")),
-        E("div", {}, _("Do not panic, everything can be fixed, just..."))
-      ])
-    ]),
-    renderButton({
-      classNames: ["cbi-button-save"],
-      text: _("Visit Wiki"),
-      onClick: () => window.open(
-        "https://podkop.net/docs/troubleshooting/?utm_source=podkop",
-        "_blank",
-        "noopener,noreferrer"
-      )
-    })
-  ]);
-}
-
 // src/podkop/tabs/diagnostic/checks/runSectionsCheck.ts
 async function runSectionsCheck() {
   const { order, title, code } = DIAGNOSTICS_CHECKS_MAP.OUTBOUNDS;
@@ -5614,6 +5571,185 @@ async function handleDisable() {
     });
   }
 }
+function compareVersions(a, b) {
+  const partsA = a.replace(/^v/, "").split(/[.-]/).map((part) => parseInt(part, 10) || 0);
+  const partsB = b.replace(/^v/, "").split(/[.-]/).map((part) => parseInt(part, 10) || 0);
+  const length = Math.max(partsA.length, partsB.length);
+  for (let index = 0; index < length; index += 1) {
+    const valueA = partsA[index] ?? 0;
+    const valueB = partsB[index] ?? 0;
+    if (valueA > valueB) {
+      return 1;
+    }
+    if (valueA < valueB) {
+      return -1;
+    }
+  }
+  return 0;
+}
+function isUpdateAvailable() {
+  const systemInfo = store.get().diagnosticsSystemInfo;
+  if (systemInfo.loading) {
+    return false;
+  }
+  const latest = (systemInfo.podkop_latest_version || "").replace(/^v/, "");
+  const current = (systemInfo.podkop_version || "").replace(/^v/, "");
+  if (!latest || latest === "unknown" || latest === "loading" || latest === current) {
+    return false;
+  }
+  return compareVersions(latest, current) > 0;
+}
+function renderUpdateLog(output) {
+  return E(
+    "pre",
+    { class: "pdk_diagnostic-page__update-log" },
+    output && output.trim() ? output : _("No output")
+  );
+}
+async function handleUpdatePodkop() {
+  const systemInfo = store.get().diagnosticsSystemInfo;
+  const from = systemInfo.podkop_version.replace(/^v/, "");
+  const to = systemInfo.podkop_latest_version.replace(/^v/, "");
+  const runUpdate = async () => {
+    const diagnosticsActions = store.get().diagnosticsActions;
+    store.set({
+      diagnosticsActions: {
+        ...diagnosticsActions,
+        update: { loading: true }
+      }
+    });
+    ui.showModal(
+      _("Updating PodForCOP"),
+      E("div", { class: "pdk_diagnostic-page__update" }, [
+        E(
+          "p",
+          { class: "spinning" },
+          _(
+            "Downloading and installing the update. This can take a few minutes. Do not close this page."
+          )
+        ),
+        E(
+          "pre",
+          { class: "pdk_diagnostic-page__update-log" },
+          _("Please wait...")
+        )
+      ])
+    );
+    try {
+      const response = await PodkopShellMethods.updateToLatest();
+      if (!response.success) {
+        throw new Error(response.error || _("Update failed"));
+      }
+      const data = response.data;
+      const output = String(data.output || "").replace(/\\n/g, "\n");
+      ui.showModal(
+        data.success ? _("Update completed") : _("Update failed"),
+        E("div", { class: "pdk_diagnostic-page__update" }, [
+          E(
+            "p",
+            {},
+            data.success ? _(
+              "PodForCOP has been updated. Reload the page to use the new interface."
+            ) : _(
+              "The update failed. The output below may help to diagnose the problem."
+            )
+          ),
+          renderUpdateLog(output),
+          E("div", { class: "pdk_diagnostic-page__update-actions" }, [
+            ...data.success ? [
+              E(
+                "button",
+                {
+                  class: "btn cbi-button cbi-button-apply",
+                  click: () => window.location.reload()
+                },
+                _("Reload page")
+              )
+            ] : [],
+            E(
+              "button",
+              {
+                class: "btn cbi-button",
+                click: () => ui.hideModal()
+              },
+              _("Close")
+            )
+          ])
+        ])
+      );
+      if (data.success) {
+        showToast(_("Update completed"), "success");
+      } else {
+        showToast(_("Update failed"), "error");
+      }
+    } catch (e) {
+      logger.error("[DIAGNOSTIC]", "handleUpdatePodkop - e", e);
+      const message = e instanceof Error ? e.message : String(e);
+      ui.showModal(
+        _("Update failed"),
+        E("div", { class: "pdk_diagnostic-page__update" }, [
+          E("p", {}, _("The update failed. Check the output below.")),
+          renderUpdateLog(message),
+          E("div", { class: "pdk_diagnostic-page__update-actions" }, [
+            E(
+              "button",
+              {
+                class: "btn cbi-button",
+                click: () => ui.hideModal()
+              },
+              _("Close")
+            )
+          ])
+        ])
+      );
+      showToast(_("Update failed"), "error");
+    } finally {
+      store.set({
+        diagnosticsActions: {
+          ...store.get().diagnosticsActions,
+          update: { loading: false }
+        }
+      });
+    }
+  };
+  ui.showModal(
+    _("Update PodForCOP"),
+    E("div", { class: "pdk_diagnostic-page__update" }, [
+      E(
+        "p",
+        {},
+        _(
+          "A new version is available: {from} \u2192 {to}. PodForCOP will download the official packages, verify their SHA256 checksums, install them and restart the service."
+        ).replace("{from}", from).replace("{to}", to)
+      ),
+      E(
+        "p",
+        {},
+        _(
+          "Your settings and sections are kept. The service will be restarted after the update."
+        )
+      ),
+      E("div", { class: "pdk_diagnostic-page__update-actions" }, [
+        E(
+          "button",
+          {
+            class: "btn cbi-button",
+            click: () => ui.hideModal()
+          },
+          _("Cancel")
+        ),
+        E(
+          "button",
+          {
+            class: "btn cbi-button cbi-button-apply",
+            click: runUpdate
+          },
+          _("Update")
+        )
+      ])
+    ])
+  );
+}
 async function handlePrivacyTest() {
   const diagnosticsActions = store.get().diagnosticsActions;
   store.set({
@@ -5775,23 +5911,6 @@ async function handleShowSingBoxConfig() {
     });
   }
 }
-function renderWikiDisclaimerWidget() {
-  const diagnosticsChecks = store.get().diagnosticsChecks;
-  function getWikiKind() {
-    const allResults = diagnosticsChecks.map((check) => check.state);
-    if (allResults.includes("error")) {
-      return "error";
-    }
-    if (allResults.includes("warning")) {
-      return "warning";
-    }
-    return "default";
-  }
-  const container = document.getElementById("pdk_diagnostic-page-wiki");
-  return preserveScrollForPage(() => {
-    container.replaceChildren(renderWikiDisclaimer(getWikiKind()));
-  });
-}
 function renderDiagnosticAvailableActionsWidget() {
   const diagnosticsActions = store.get().diagnosticsActions;
   const servicesInfoWidget = store.get().servicesInfoWidget;
@@ -5849,6 +5968,12 @@ function renderDiagnosticAvailableActionsWidget() {
       onClick: handlePrivacyTest,
       disabled: atLeastOneServiceCommandLoading
     },
+    update: {
+      loading: diagnosticsActions.update.loading,
+      visible: isUpdateAvailable(),
+      onClick: handleUpdatePodkop,
+      disabled: atLeastOneServiceCommandLoading
+    },
     showSingBoxConfig: {
       loading: diagnosticsActions.showSingBoxConfig.loading,
       visible: true,
@@ -5900,12 +6025,11 @@ function renderDiagnosticSystemInfoWidget() {
 async function onStoreUpdate2(next, prev, diff) {
   if (diff.diagnosticsChecks) {
     renderDiagnosticsChecks();
-    renderWikiDisclaimerWidget();
   }
   if (diff.diagnosticsRunAction) {
     renderDiagnosticRunActionWidget();
   }
-  if (diff.diagnosticsActions || diff.servicesInfoWidget) {
+  if (diff.diagnosticsActions || diff.servicesInfoWidget || diff.diagnosticsSystemInfo) {
     renderDiagnosticAvailableActionsWidget();
   }
   if (diff.diagnosticsSystemInfo) {
@@ -5936,7 +6060,6 @@ function onPageMount2() {
   renderDiagnosticRunActionWidget();
   renderDiagnosticAvailableActionsWidget();
   renderDiagnosticSystemInfoWidget();
-  renderWikiDisclaimerWidget();
   fetchServicesInfo();
   fetchSystemInfo();
 }
@@ -6014,31 +6137,6 @@ var styles4 = `
     grid-template-columns: 1fr;
     grid-row-gap: 10px;
 }
-
-.pdk_diagnostic-page__right-bar__wiki {
-    border: 2px var(--background-color-low, lightgray) solid;
-    border-radius: 4px;
-    padding: 10px;
-
-    display: grid;
-    grid-template-columns: auto;
-    grid-row-gap: 10px;
-}
-
-.pdk_diagnostic-page__right-bar__wiki--warning {
-    border: 2px var(--warn-color-medium, orange) solid;
-}
-.pdk_diagnostic-page__right-bar__wiki--error {
-    border: 2px var(--error-color-medium, red) solid;
-}
-
-.pdk_diagnostic-page__right-bar__wiki__content {
-    display: grid;
-    grid-template-columns: 1fr 5fr;
-    grid-column-gap: 10px;
-}
-
-.pdk_diagnostic-page__right-bar__wiki__texts {}
 
 .pdk_diagnostic-page__right-bar__actions {
     border: 2px var(--background-color-low, lightgray) solid;
@@ -6195,6 +6293,35 @@ var styles4 = `
     display: flex;
     justify-content: flex-end;
     margin-top: 10px;
+}
+.pdk_diagnostic-page__update {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 420px;
+    max-width: 760px;
+}
+
+.pdk_diagnostic-page__update-log {
+    max-height: 45vh;
+    overflow: auto;
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.18);
+    color: inherit;
+    font-family: monospace;
+    font-size: 0.82em;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.pdk_diagnostic-page__update-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 4px;
 }`;
 
 // src/podkop/tabs/diagnostic/index.ts

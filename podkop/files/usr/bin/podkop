@@ -3388,6 +3388,152 @@ privacy_test() {
     rm -f "$egress_file"
 }
 
+# --- Self-update -----------------------------------------------------------
+# Downloads the packages of the latest GitHub release, verifies SHA256SUMS and
+# installs them. Diagnostics UI exposes this behind a confirmation dialog.
+_podkop_update_fetch() {
+    local url="$1"
+    local out="$2"
+
+    if command -v curl > /dev/null 2>&1; then
+        curl -fsSL --connect-timeout 20 -o "$out" "$url" 2> /dev/null
+    elif command -v wget > /dev/null 2>&1; then
+        wget -q -O "$out" "$url" 2> /dev/null
+    elif command -v uclient-fetch > /dev/null 2>&1; then
+        uclient-fetch -q -O "$out" "$url" 2> /dev/null
+    else
+        return 1
+    fi
+}
+
+_podkop_update_latest_tag() {
+    local tag
+
+    if command -v curl > /dev/null 2>&1; then
+        tag=$(curl -fsSL -m 10 https://api.github.com/repos/19man91-ops/podforkop/releases/latest 2> /dev/null |
+            sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+    fi
+    [ -n "$tag" ] || tag=$(wget -qO- -T 10 https://raw.githubusercontent.com/19man91-ops/podforkop/main/VERSION 2> /dev/null || true)
+    echo "$tag" | tr -d 'v\r\n'
+}
+
+update_to_latest() {
+    local current latest pkg_ext base tmp file sha_file output rc
+    local files=""
+
+    current=$(show_version | tr -d 'v\r\n')
+    latest=$(_podkop_update_latest_tag)
+    if [ -z "$latest" ]; then
+        jq -n --arg from "$current" '{
+            success: false,
+            from: $from,
+            error: "could_not_resolve_latest_version",
+            output: "Не удалось получить номер последней версии с GitHub. Проверьте интернет и DNS."
+        }'
+        return 0
+    fi
+
+    if [ "$current" = "$latest" ]; then
+        jq -n --arg from "$current" --arg to "$latest" '{
+            success: true,
+            updated: false,
+            from: $from,
+            to: $to,
+            output: "Установлена последняя версия PodForCOP."
+        }'
+        return 0
+    fi
+
+    if command -v apk > /dev/null 2>&1; then
+        pkg_ext="apk"
+        files="luci-app-podkop-${latest}-r1.apk luci-i18n-podkop-ru-${latest}.apk podkop-${latest}-r1.apk"
+    else
+        pkg_ext="ipk"
+        files="luci-app-podkop-v${latest}-r1-all.ipk luci-i18n-podkop-ru-${latest}.ipk podkop-v${latest}-r1-all.ipk"
+    fi
+
+    tmp=$(mktemp -d /tmp/podkop-update.XXXXXX)
+    base="https://github.com/19man91-ops/podforkop/releases/download/${latest}"
+    output=""
+    rc=0
+
+    for file in $files; do
+        if ! _podkop_update_fetch "${base}/${file}" "$tmp/$file"; then
+            output="${output}Не удалось скачать ${file}\n"
+            rc=1
+            break
+        fi
+        output="${output}Скачано: ${file}\n"
+    done
+
+    if [ "$rc" -eq 0 ]; then
+        if ! _podkop_update_fetch "${base}/SHA256SUMS" "$tmp/SHA256SUMS"; then
+            output="${output}Не удалось скачать SHA256SUMS — установка отменена.\n"
+            rc=1
+        elif ! command -v sha256sum > /dev/null 2>&1; then
+            output="${output}sha256sum недоступен — установка отменена.\n"
+            rc=1
+        else
+            for file in $files; do
+                sha_file=$(grep "[ /]${file}$" "$tmp/SHA256SUMS" | awk '{print $1}')
+                if [ -z "$sha_file" ]; then
+                    output="${output}В SHA256SUMS нет ${file} — установка отменена.\n"
+                    rc=1
+                    break
+                fi
+                if [ "$sha_file" != "$(sha256sum "$tmp/$file" | awk '{print $1}')" ]; then
+                    output="${output}Несовпадение SHA256 для ${file} — установка отменена.\n"
+                    rc=1
+                    break
+                fi
+                output="${output}SHA256 OK: ${file}\n"
+            done
+        fi
+    fi
+
+    if [ "$rc" -eq 0 ]; then
+        output="${output}Установка пакетов...\n"
+        for file in $files; do
+            if command -v apk > /dev/null 2>&1; then
+                apk add --allow-untrusted "$tmp/$file" >> "$tmp/install.log" 2>&1 || rc=1
+            else
+                opkg install "$tmp/$file" >> "$tmp/install.log" 2>&1 || rc=1
+            fi
+            [ "$rc" -ne 0 ] && break
+        done
+        output="${output}$(cat "$tmp/install.log" 2> /dev/null)"
+    fi
+
+    if [ "$rc" -eq 0 ]; then
+        output="${output}\n\nПерезапуск Podkop...\n"
+        /etc/init.d/podkop restart >> "$tmp/restart.log" 2>&1
+        output="${output}$(cat "$tmp/restart.log" 2> /dev/null)"
+    fi
+
+    rm -rf "$tmp"
+
+    output=$(printf '%s' "$output" | tail -c 20000)
+    if [ "$rc" -eq 0 ]; then
+        jq -n --arg from "$current" --arg to "$latest" --arg output "$output" '{
+            success: true,
+            updated: true,
+            from: $from,
+            to: $to,
+            output: $output
+        }'
+    else
+        jq -n --arg from "$current" --arg to "$latest" --arg output "$output" '{
+            success: false,
+            updated: false,
+            from: $from,
+            to: $to,
+            error: "update_failed",
+            output: $output
+        }'
+        return 0
+    fi
+}
+
 show_help() {
     cat << EOF
 Usage: $0 COMMAND
@@ -3424,6 +3570,7 @@ Available commands:
     get_system_info         Get system information in JSON format
     get_sing_box_features   Get the features of the installed sing-box in JSON format
     check_dns_available     Check DNS server availability
+    update_to_latest        Download and install the latest release packages
     global_check            Run global system check
 EOF
 }
@@ -3494,6 +3641,9 @@ show_config)
     ;;
 show_version)
     show_version
+    ;;
+update_to_latest)
+    update_to_latest
     ;;
 show_sing_box_config)
     show_sing_box_config

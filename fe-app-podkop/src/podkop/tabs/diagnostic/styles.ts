@@ -28,31 +28,6 @@ export const styles = `
     grid-row-gap: 10px;
 }
 
-.pdk_diagnostic-page__right-bar__wiki {
-    border: 2px var(--background-color-low, lightgray) solid;
-    border-radius: 4px;
-    padding: 10px;
-
-    display: grid;
-    grid-template-columns: auto;
-    grid-row-gap: 10px;
-}
-
-.pdk_diagnostic-page__right-bar__wiki--warning {
-    border: 2px var(--warn-color-medium, orange) solid;
-}
-.pdk_diagnostic-page__right-bar__wiki--error {
-    border: 2px var(--error-color-medium, red) solid;
-}
-
-.pdk_diagnostic-page__right-bar__wiki__content {
-    display: grid;
-    grid-template-columns: 1fr 5fr;
-    grid-column-gap: 10px;
-}
-
-.pdk_diagnostic-page__right-bar__wiki__texts {}
-
 .pdk_diagnostic-page__right-bar__actions {
     border: 2px var(--background-color-low, lightgray) solid;
     border-radius: 4px;
@@ -208,4 +183,33 @@ export const styles = `
     display: flex;
     justify-content: flex-end;
     margin-top: 10px;
+}
+.pdk_diagnostic-page__update {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 420px;
+    max-width: 760px;
+}
+
+.pdk_diagnostic-page__update-log {
+    max-height: 45vh;
+    overflow: auto;
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.18);
+    color: inherit;
+    font-family: monospace;
+    font-size: 0.82em;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.pdk_diagnostic-page__update-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 4px;
 }`;

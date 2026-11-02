@@ -69,6 +69,7 @@ export namespace Podkop {
     ADD_DOMAIN_EXCLUSION = 'add_domain_exclusion',
     TELEGRAM_TEST = 'telegram_test',
     PRIVACY_TEST = 'privacy_test',
+    UPDATE_TO_LATEST = 'update_to_latest',
   }
 
   export enum AvailableClashAPIMethods {
@@ -181,6 +182,15 @@ export namespace Podkop {
     status: 'ok' | 'error';
     ip: string;
     country: string;
+  }
+
+  export interface UpdatePodkopResult {
+    success: boolean;
+    updated?: boolean;
+    from: string;
+    to: string;
+    output?: string;
+    error?: string;
   }
 
   export interface PrivacyTestResult {

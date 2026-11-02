@@ -134,6 +134,13 @@ export const PodkopShellMethods = {
       '/usr/bin/podkop',
       20000,
     ),
+  updateToLatest: async () =>
+    callBaseMethod<Podkop.UpdatePodkopResult>(
+      Podkop.AvailableMethods.UPDATE_TO_LATEST,
+      [],
+      '/usr/bin/podkop',
+      600000,
+    ),
   privacyTest: async () =>
     callBaseMethod<Podkop.PrivacyTestResult>(
       Podkop.AvailableMethods.PRIVACY_TEST,

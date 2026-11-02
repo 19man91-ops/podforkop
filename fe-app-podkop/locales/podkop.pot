@@ -1585,3 +1585,46 @@ msgstr ""
 msgid "Bootstrap DNS"
 msgstr ""
 
+
+msgid "A new version is available: {from} → {to}. PodForCOP will download the official packages, verify their SHA256 checksums, install them and restart the service."
+msgstr ""
+
+msgid "Downloading and installing the update. This can take a few minutes. Do not close this page."
+msgstr ""
+
+msgid "No output"
+msgstr ""
+
+msgid "Please wait..."
+msgstr ""
+
+msgid "PodForCOP has been updated. Reload the page to use the new interface."
+msgstr ""
+
+msgid "Reload page"
+msgstr ""
+
+msgid "The update failed. Check the output below."
+msgstr ""
+
+msgid "The update failed. The output below may help to diagnose the problem."
+msgstr ""
+
+msgid "Update"
+msgstr ""
+
+msgid "Update completed"
+msgstr ""
+
+msgid "Update failed"
+msgstr ""
+
+msgid "Update PodForCOP"
+msgstr ""
+
+msgid "Updating PodForCOP"
+msgstr ""
+
+msgid "Your settings and sections are kept. The service will be restarted after the update."
+msgstr ""
+

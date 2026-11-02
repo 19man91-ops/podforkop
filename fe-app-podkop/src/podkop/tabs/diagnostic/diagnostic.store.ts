@@ -52,6 +52,9 @@ export const initialDiagnosticStore: Pick<
     privacyTest: {
       loading: false,
     },
+    update: {
+      loading: false,
+    },
   },
   diagnosticsRunAction: { loading: false },
   diagnosticsChecks: [

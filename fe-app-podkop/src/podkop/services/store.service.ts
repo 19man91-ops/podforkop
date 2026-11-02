@@ -188,6 +188,7 @@ export interface StoreType {
     viewLogs: { loading: boolean };
     showSingBoxConfig: { loading: boolean };
     privacyTest: { loading: boolean };
+    update: { loading: boolean };
   };
   diagnosticsSystemInfo: {
     loading: boolean;

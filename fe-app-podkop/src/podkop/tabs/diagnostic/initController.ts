@@ -17,7 +17,6 @@ import { normalizeCompiledVersion } from '../../../helpers/normalizeCompiledVers
 import { renderModal } from '../../../partials';
 import { PODKOP_LUCI_APP_VERSION } from '../../../constants';
 import { showToast } from '../../../helpers/showToast';
-import { renderWikiDisclaimer } from './partials/renderWikiDisclaimer';
 import { runSectionsCheck } from './checks/runSectionsCheck';
 import { getPodkopVersionRow } from './helpers/getPodkopVersionRow';
 
@@ -209,6 +208,220 @@ async function handleDisable() {
   }
 }
 
+function compareVersions(a: string, b: string): number {
+  const partsA = a
+    .replace(/^v/, '')
+    .split(/[.-]/)
+    .map((part) => parseInt(part, 10) || 0);
+  const partsB = b
+    .replace(/^v/, '')
+    .split(/[.-]/)
+    .map((part) => parseInt(part, 10) || 0);
+  const length = Math.max(partsA.length, partsB.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const valueA = partsA[index] ?? 0;
+    const valueB = partsB[index] ?? 0;
+    if (valueA > valueB) {
+      return 1;
+    }
+    if (valueA < valueB) {
+      return -1;
+    }
+  }
+
+  return 0;
+}
+
+function isUpdateAvailable(): boolean {
+  const systemInfo = store.get().diagnosticsSystemInfo;
+
+  if (systemInfo.loading) {
+    return false;
+  }
+
+  const latest = (systemInfo.podkop_latest_version || '').replace(/^v/, '');
+  const current = (systemInfo.podkop_version || '').replace(/^v/, '');
+
+  if (
+    !latest ||
+    latest === 'unknown' ||
+    latest === 'loading' ||
+    latest === current
+  ) {
+    return false;
+  }
+
+  return compareVersions(latest, current) > 0;
+}
+
+function renderUpdateLog(output: string) {
+  return E(
+    'pre',
+    { class: 'pdk_diagnostic-page__update-log' },
+    output && output.trim() ? output : _('No output'),
+  );
+}
+
+async function handleUpdatePodkop() {
+  const systemInfo = store.get().diagnosticsSystemInfo;
+  const from = systemInfo.podkop_version.replace(/^v/, '');
+  const to = systemInfo.podkop_latest_version.replace(/^v/, '');
+
+  const runUpdate = async () => {
+    const diagnosticsActions = store.get().diagnosticsActions;
+    store.set({
+      diagnosticsActions: {
+        ...diagnosticsActions,
+        update: { loading: true },
+      },
+    });
+
+    ui.showModal(
+      _('Updating PodForCOP'),
+      E('div', { class: 'pdk_diagnostic-page__update' }, [
+        E(
+          'p',
+          { class: 'spinning' },
+          _(
+            'Downloading and installing the update. This can take a few minutes. Do not close this page.',
+          ),
+        ),
+        E(
+          'pre',
+          { class: 'pdk_diagnostic-page__update-log' },
+          _('Please wait...'),
+        ),
+      ]),
+    );
+
+    try {
+      const response = await PodkopShellMethods.updateToLatest();
+
+      if (!response.success) {
+        throw new Error(response.error || _('Update failed'));
+      }
+
+      const data = response.data;
+      const output = String(data.output || '').replace(/\\n/g, '\n');
+
+      ui.showModal(
+        data.success ? _('Update completed') : _('Update failed'),
+        E('div', { class: 'pdk_diagnostic-page__update' }, [
+          E(
+            'p',
+            {},
+            data.success
+              ? _(
+                  'PodForCOP has been updated. Reload the page to use the new interface.',
+                )
+              : _(
+                  'The update failed. The output below may help to diagnose the problem.',
+                ),
+          ),
+          renderUpdateLog(output),
+          E('div', { class: 'pdk_diagnostic-page__update-actions' }, [
+            ...(data.success
+              ? [
+                  E(
+                    'button',
+                    {
+                      class: 'btn cbi-button cbi-button-apply',
+                      click: () => window.location.reload(),
+                    },
+                    _('Reload page'),
+                  ),
+                ]
+              : []),
+            E(
+              'button',
+              {
+                class: 'btn cbi-button',
+                click: () => ui.hideModal(),
+              },
+              _('Close'),
+            ),
+          ]),
+        ]),
+      );
+
+      if (data.success) {
+        showToast(_('Update completed'), 'success');
+      } else {
+        showToast(_('Update failed'), 'error');
+      }
+    } catch (e) {
+      logger.error('[DIAGNOSTIC]', 'handleUpdatePodkop - e', e);
+      const message = e instanceof Error ? e.message : String(e);
+      ui.showModal(
+        _('Update failed'),
+        E('div', { class: 'pdk_diagnostic-page__update' }, [
+          E('p', {}, _('The update failed. Check the output below.')),
+          renderUpdateLog(message),
+          E('div', { class: 'pdk_diagnostic-page__update-actions' }, [
+            E(
+              'button',
+              {
+                class: 'btn cbi-button',
+                click: () => ui.hideModal(),
+              },
+              _('Close'),
+            ),
+          ]),
+        ]),
+      );
+      showToast(_('Update failed'), 'error');
+    } finally {
+      store.set({
+        diagnosticsActions: {
+          ...store.get().diagnosticsActions,
+          update: { loading: false },
+        },
+      });
+    }
+  };
+
+  ui.showModal(
+    _('Update PodForCOP'),
+    E('div', { class: 'pdk_diagnostic-page__update' }, [
+      E(
+        'p',
+        {},
+        _(
+          'A new version is available: {from} → {to}. PodForCOP will download the official packages, verify their SHA256 checksums, install them and restart the service.',
+        )
+          .replace('{from}', from)
+          .replace('{to}', to),
+      ),
+      E(
+        'p',
+        {},
+        _(
+          'Your settings and sections are kept. The service will be restarted after the update.',
+        ),
+      ),
+      E('div', { class: 'pdk_diagnostic-page__update-actions' }, [
+        E(
+          'button',
+          {
+            class: 'btn cbi-button',
+            click: () => ui.hideModal(),
+          },
+          _('Cancel'),
+        ),
+        E(
+          'button',
+          {
+            class: 'btn cbi-button cbi-button-apply',
+            click: runUpdate,
+          },
+          _('Update'),
+        ),
+      ]),
+    ]),
+  );
+}
+
 async function handlePrivacyTest() {
   const diagnosticsActions = store.get().diagnosticsActions;
   store.set({
@@ -394,30 +607,6 @@ async function handleShowSingBoxConfig() {
   }
 }
 
-function renderWikiDisclaimerWidget() {
-  const diagnosticsChecks = store.get().diagnosticsChecks;
-
-  function getWikiKind() {
-    const allResults = diagnosticsChecks.map((check) => check.state);
-
-    if (allResults.includes('error')) {
-      return 'error';
-    }
-
-    if (allResults.includes('warning')) {
-      return 'warning';
-    }
-
-    return 'default';
-  }
-
-  const container = document.getElementById('pdk_diagnostic-page-wiki');
-
-  return preserveScrollForPage(() => {
-    container!.replaceChildren(renderWikiDisclaimer(getWikiKind()));
-  });
-}
-
 function renderDiagnosticAvailableActionsWidget() {
   const diagnosticsActions = store.get().diagnosticsActions;
   const servicesInfoWidget = store.get().servicesInfoWidget;
@@ -482,6 +671,12 @@ function renderDiagnosticAvailableActionsWidget() {
       onClick: handlePrivacyTest,
       disabled: atLeastOneServiceCommandLoading,
     },
+    update: {
+      loading: diagnosticsActions.update.loading,
+      visible: isUpdateAvailable(),
+      onClick: handleUpdatePodkop,
+      disabled: atLeastOneServiceCommandLoading,
+    },
     showSingBoxConfig: {
       loading: diagnosticsActions.showSingBoxConfig.loading,
       visible: true,
@@ -543,14 +738,17 @@ async function onStoreUpdate(
 ) {
   if (diff.diagnosticsChecks) {
     renderDiagnosticsChecks();
-    renderWikiDisclaimerWidget();
   }
 
   if (diff.diagnosticsRunAction) {
     renderDiagnosticRunActionWidget();
   }
 
-  if (diff.diagnosticsActions || diff.servicesInfoWidget) {
+  if (
+    diff.diagnosticsActions ||
+    diff.servicesInfoWidget ||
+    diff.diagnosticsSystemInfo
+  ) {
     renderDiagnosticAvailableActionsWidget();
   }
 
@@ -600,9 +798,6 @@ function onPageMount() {
 
   // Initial system info render
   renderDiagnosticSystemInfoWidget();
-
-  // Initial Wiki disclaimer render
-  renderWikiDisclaimerWidget();
 
   // Initial services info fetch
   fetchServicesInfo();

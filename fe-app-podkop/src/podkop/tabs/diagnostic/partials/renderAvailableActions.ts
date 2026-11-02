@@ -28,6 +28,7 @@ interface IRenderAvailableActionsProps {
   viewLogs: ActionProps;
   showSingBoxConfig: ActionProps;
   privacyTest: ActionProps;
+  update: ActionProps;
 }
 
 export function renderAvailableActions({
@@ -40,9 +41,20 @@ export function renderAvailableActions({
   viewLogs,
   showSingBoxConfig,
   privacyTest,
+  update,
 }: IRenderAvailableActionsProps) {
   return E('div', { class: 'pdk_diagnostic-page__right-bar__actions' }, [
     E('b', {}, _('Available actions')),
+    ...insertIf(update.visible, [
+      renderButton({
+        classNames: ['cbi-button-save'],
+        onClick: update.onClick,
+        icon: renderRotateCcwIcon24,
+        text: _('Update PodForCOP'),
+        loading: update.loading,
+        disabled: update.disabled,
+      }),
+    ]),
     ...insertIf(restart.visible, [
       renderButton({
         classNames: ['cbi-button-apply'],
