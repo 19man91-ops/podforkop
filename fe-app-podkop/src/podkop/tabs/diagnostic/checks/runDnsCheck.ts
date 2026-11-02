@@ -34,17 +34,48 @@ export async function runDnsCheck() {
 
   const data = dnsChecks.data;
 
+  const mainServers =
+    data.dns_servers && data.dns_servers.length > 0
+      ? data.dns_servers
+      : [{ server: data.dns_server, status: data.dns_status }];
+  const bootstrapServers =
+    data.bootstrap_dns_servers && data.bootstrap_dns_servers.length > 0
+      ? data.bootstrap_dns_servers
+      : [
+          {
+            server: data.bootstrap_dns_server,
+            status: data.bootstrap_dns_status,
+          },
+        ];
+
+  const mainItems: IDiagnosticsChecksItem[] = mainServers.map((server) => ({
+    state: server.status ? 'success' : 'error',
+    key: _('Main DNS'),
+    value: `${server.server} [${data.dns_type}]`,
+  }));
+
+  const bootstrapItems: IDiagnosticsChecksItem[] = insertIf(
+    data.dns_type === 'doh' ||
+      data.dns_type === 'dot' ||
+      bootstrapServers.some((server) => !server.status),
+    bootstrapServers.map((server) => ({
+      state: server.status ? 'success' : 'error',
+      key: _('Bootstrap DNS'),
+      value: server.server,
+    })),
+  );
+
   const allGood =
     Boolean(data.dns_on_router) &&
     Boolean(data.dhcp_config_status) &&
-    Boolean(data.bootstrap_dns_status) &&
-    Boolean(data.dns_status);
+    mainServers.every((server) => Boolean(server.status)) &&
+    bootstrapServers.every((server) => Boolean(server.status));
 
   const atLeastOneGood =
     Boolean(data.dns_on_router) ||
     Boolean(data.dhcp_config_status) ||
-    Boolean(data.bootstrap_dns_status) ||
-    Boolean(data.dns_status);
+    mainServers.some((server) => Boolean(server.status)) ||
+    bootstrapServers.some((server) => Boolean(server.status));
 
   const { state, description } = getMeta({ atLeastOneGood, allGood });
 
@@ -55,23 +86,8 @@ export async function runDnsCheck() {
     description,
     state,
     items: [
-      ...insertIf<IDiagnosticsChecksItem>(
-        data.dns_type === 'doh' ||
-          data.dns_type === 'dot' ||
-          !data.bootstrap_dns_status,
-        [
-          {
-            state: data.bootstrap_dns_status ? 'success' : 'error',
-            key: _('Bootsrap DNS'),
-            value: data.bootstrap_dns_server,
-          },
-        ],
-      ),
-      {
-        state: data.dns_status ? 'success' : 'error',
-        key: _('Main DNS'),
-        value: `${data.dns_server} [${data.dns_type}]`,
-      },
+      ...bootstrapItems,
+      ...mainItems,
       {
         state: data.dns_on_router ? 'success' : 'error',
         key: _('DNS on router'),

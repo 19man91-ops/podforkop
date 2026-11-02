@@ -4029,8 +4029,28 @@ async function runDnsCheck() {
     throw new Error("DNS checks failed");
   }
   const data = dnsChecks.data;
-  const allGood = Boolean(data.dns_on_router) && Boolean(data.dhcp_config_status) && Boolean(data.bootstrap_dns_status) && Boolean(data.dns_status);
-  const atLeastOneGood = Boolean(data.dns_on_router) || Boolean(data.dhcp_config_status) || Boolean(data.bootstrap_dns_status) || Boolean(data.dns_status);
+  const mainServers = data.dns_servers && data.dns_servers.length > 0 ? data.dns_servers : [{ server: data.dns_server, status: data.dns_status }];
+  const bootstrapServers = data.bootstrap_dns_servers && data.bootstrap_dns_servers.length > 0 ? data.bootstrap_dns_servers : [
+    {
+      server: data.bootstrap_dns_server,
+      status: data.bootstrap_dns_status
+    }
+  ];
+  const mainItems = mainServers.map((server) => ({
+    state: server.status ? "success" : "error",
+    key: _("Main DNS"),
+    value: `${server.server} [${data.dns_type}]`
+  }));
+  const bootstrapItems = insertIf(
+    data.dns_type === "doh" || data.dns_type === "dot" || bootstrapServers.some((server) => !server.status),
+    bootstrapServers.map((server) => ({
+      state: server.status ? "success" : "error",
+      key: _("Bootstrap DNS"),
+      value: server.server
+    }))
+  );
+  const allGood = Boolean(data.dns_on_router) && Boolean(data.dhcp_config_status) && mainServers.every((server) => Boolean(server.status)) && bootstrapServers.every((server) => Boolean(server.status));
+  const atLeastOneGood = Boolean(data.dns_on_router) || Boolean(data.dhcp_config_status) || mainServers.some((server) => Boolean(server.status)) || bootstrapServers.some((server) => Boolean(server.status));
   const { state, description } = getMeta({ atLeastOneGood, allGood });
   updateCheckStore({
     order,
@@ -4039,21 +4059,8 @@ async function runDnsCheck() {
     description,
     state,
     items: [
-      ...insertIf(
-        data.dns_type === "doh" || data.dns_type === "dot" || !data.bootstrap_dns_status,
-        [
-          {
-            state: data.bootstrap_dns_status ? "success" : "error",
-            key: _("Bootsrap DNS"),
-            value: data.bootstrap_dns_server
-          }
-        ]
-      ),
-      {
-        state: data.dns_status ? "success" : "error",
-        key: _("Main DNS"),
-        value: `${data.dns_server} [${data.dns_type}]`
-      },
+      ...bootstrapItems,
+      ...mainItems,
       {
         state: data.dns_on_router ? "success" : "error",
         key: _("DNS on router"),
@@ -5350,66 +5357,36 @@ async function runSectionsCheck() {
     });
     throw new Error("Sections checks failed");
   }
-  const items = await Promise.all(
+  const items = (await Promise.all(
     sections.data.map(async (section) => {
-      async function getLatency() {
-        if (section.withTagSelect) {
-          const latencyGroup = await PodkopShellMethods.getClashApiGroupLatency(
-            section.code
-          );
-          const selectedOutbound = section.outbounds.find(
-            (item) => item.selected
-          );
-          const isUrlTest = selectedOutbound?.type === "URLTest";
-          const success3 = latencyGroup.success && !latencyGroup.data.message;
-          if (success3) {
-            if (isUrlTest) {
-              const latency2 = Object.values(latencyGroup.data).map((item) => item ? `${item}ms` : "n/a").join(" / ");
-              return {
-                success: true,
-                latency: `[${_("Fastest")}] ${latency2}`
-              };
-            }
-            const selectedProxyDelay = latencyGroup.data?.[selectedOutbound?.code ?? ""];
-            if (selectedProxyDelay) {
-              return {
-                success: true,
-                latency: `[${selectedOutbound?.displayName ?? ""}] ${selectedProxyDelay}ms`
-              };
-            }
-            return {
-              success: false,
-              latency: `[${selectedOutbound?.displayName ?? ""}] ${_("Not responding")}`
-            };
-          }
-          return {
-            success: false,
-            latency: _("Not responding")
-          };
-        }
-        const latencyProxy = await PodkopShellMethods.getClashApiProxyLatency(
+      if (section.withTagSelect) {
+        const latencyGroup = await PodkopShellMethods.getClashApiGroupLatency(
           section.code
         );
-        const success2 = latencyProxy.success && !latencyProxy.data.message;
-        if (success2) {
+        const groupSuccess = latencyGroup.success && !latencyGroup.data.message;
+        return section.outbounds.map((outbound) => {
+          const delay = groupSuccess ? latencyGroup.data?.[outbound.code] : void 0;
+          const success2 = Boolean(delay);
           return {
-            success: true,
-            latency: `${latencyProxy.data.delay} ms`
+            state: success2 ? "success" : "error",
+            key: `${section.displayName} \xB7 ${outbound.displayName}`,
+            value: success2 ? `${delay} ms` : outbound.latency ? `${outbound.latency} ms` : _("Not responding")
           };
-        }
-        return {
-          success: false,
-          latency: _("Not responding")
-        };
+        });
       }
-      const { latency, success } = await getLatency();
-      return {
-        state: success ? "success" : "error",
-        key: section.displayName,
-        value: latency
-      };
+      const latencyProxy = await PodkopShellMethods.getClashApiProxyLatency(
+        section.code
+      );
+      const success = latencyProxy.success && !latencyProxy.data.message;
+      return [
+        {
+          state: success ? "success" : "error",
+          key: section.displayName,
+          value: success ? `${latencyProxy.data.delay} ms` : _("Not responding")
+        }
+      ];
     })
-  );
+  )).flat();
   const allGood = items.every((item) => item.state === "success");
   const atLeastOneGood = items.some((item) => item.state === "success");
   const { state, description } = getMeta({ atLeastOneGood, allGood });
@@ -8226,12 +8203,15 @@ var styles5 = `
     position: relative;
     width: 100%;
     min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .fkp_monitoring-page__list {
     display: table;
     table-layout: fixed;
     width: 100%;
+    min-width: 860px;
     border-collapse: separate;
     border-spacing: 0;
 }
@@ -8383,7 +8363,47 @@ var styles5 = `
     flex-wrap: wrap;
     gap: 6px;
 }
-`;
+
+/* Responsive layout: keep the whole monitoring page usable on narrow screens */
+@container (max-width: 1000px) {
+    .fkp_monitoring-page__controls {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            'filters'
+            'actions';
+        gap: 8px;
+    }
+
+    .fkp_monitoring-page__filters {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+
+    .fkp_monitoring-page__actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+}
+
+@container (max-width: 720px) {
+    .fkp_monitoring-page__cell--network,
+    .fkp_monitoring-page__cell--time {
+        display: none;
+    }
+
+    .fkp_monitoring-page__cell {
+        padding: 6px 7px;
+    }
+}
+
+@container (max-width: 520px) {
+    .fkp_monitoring-page__cell--route {
+        display: none;
+    }
+
+    .fkp_monitoring-page__list {
+        min-width: 560px;
+    }
+}`;
 
 // src/podkop/tabs/monitoring/index.ts
 var MonitoringTab = {

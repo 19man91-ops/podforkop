@@ -289,6 +289,8 @@ export namespace Podkop {
     bootstrap_dns_server: string;
     bootstrap_dns_status: 0 | 1;
     dhcp_config_status: 0 | 1;
+    dns_servers: Array<{ server: string; status: 0 | 1 }>;
+    bootstrap_dns_servers: Array<{ server: string; status: 0 | 1 }>;
   }
 
   export interface NftRulesCheckResult {

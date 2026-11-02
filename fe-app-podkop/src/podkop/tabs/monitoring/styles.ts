@@ -145,12 +145,15 @@ export const styles = `
     position: relative;
     width: 100%;
     min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .fkp_monitoring-page__list {
     display: table;
     table-layout: fixed;
     width: 100%;
+    min-width: 860px;
     border-collapse: separate;
     border-spacing: 0;
 }
@@ -302,4 +305,44 @@ export const styles = `
     flex-wrap: wrap;
     gap: 6px;
 }
-`;
+
+/* Responsive layout: keep the whole monitoring page usable on narrow screens */
+@container (max-width: 1000px) {
+    .fkp_monitoring-page__controls {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            'filters'
+            'actions';
+        gap: 8px;
+    }
+
+    .fkp_monitoring-page__filters {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+
+    .fkp_monitoring-page__actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+}
+
+@container (max-width: 720px) {
+    .fkp_monitoring-page__cell--network,
+    .fkp_monitoring-page__cell--time {
+        display: none;
+    }
+
+    .fkp_monitoring-page__cell {
+        padding: 6px 7px;
+    }
+}
+
+@container (max-width: 520px) {
+    .fkp_monitoring-page__cell--route {
+        display: none;
+    }
+
+    .fkp_monitoring-page__list {
+        min-width: 560px;
+    }
+}`;

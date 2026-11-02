@@ -2336,78 +2336,121 @@ get_status() {
     echo "{\"enabled\":$enabled,\"status\":\"$status\"}"
 }
 
+PODKOP_DNS_MAIN_LIST=""
+PODKOP_DNS_BOOTSTRAP_LIST=""
+
+_collect_dns_main() {
+    [ -n "$1" ] && PODKOP_DNS_MAIN_LIST="${PODKOP_DNS_MAIN_LIST:+$PODKOP_DNS_MAIN_LIST }$1"
+}
+
+_collect_dns_bootstrap() {
+    [ -n "$1" ] && PODKOP_DNS_BOOTSTRAP_LIST="${PODKOP_DNS_BOOTSTRAP_LIST:+$PODKOP_DNS_BOOTSTRAP_LIST }$1"
+}
+
+_mask_dns_server() {
+    local server="$1"
+
+    if echo "$server" | grep -q "\.dns\.nextdns\.io$"; then
+        local nextdns_id
+        nextdns_id=$(echo "$server" | cut -d'.' -f1)
+        echo "$(echo "$nextdns_id" | sed 's/./*/g').dns.nextdns.io"
+    elif echo "$server" | grep -q "^dns\.nextdns\.io/"; then
+        local masked_path
+        masked_path=$(echo "$server" | cut -d'/' -f2- | sed 's/./*/g')
+        echo "dns.nextdns.io/$masked_path"
+    else
+        echo "$server"
+    fi
+}
+
+_test_dns_server() {
+    local dns_type="$1"
+    local server="$2"
+    local domain="google.com"
+    local host doh_path
+
+    case "$dns_type" in
+    doh)
+        doh_path="/dns-query"
+        if echo "$server" | grep -q "/"; then
+            doh_path="/$(echo "$server" | cut -d'/' -f2-)"
+            host="$(echo "$server" | cut -d'/' -f1)"
+        else
+            host="$server"
+        fi
+        dig @"$host" "$domain" +https="$doh_path" +timeout=2 +tries=1 > /dev/null 2>&1
+        ;;
+    dot)
+        dig @"$server" "$domain" +tls +timeout=2 +tries=1 > /dev/null 2>&1
+        ;;
+    *)
+        dig @"$server" "$domain" +timeout=2 +tries=1 > /dev/null 2>&1
+        ;;
+    esac
+}
+
 check_dns_available() {
     local dns_type dns_server bootstrap_dns_server
+    local dns_servers_json='[]' bootstrap_servers_json='[]'
+    local first_dns="" first_bootstrap="" ok any server display status
+    local dns_status=0 bootstrap_dns_status=0
+
     config_get dns_type "settings" "dns_type"
 
-    local _ms_list=""
-    _cb_chk_ms() { [ -n "$1" ] && _ms_list="${_ms_list:+$_ms_list }$1"; }
-    config_list_foreach "settings" "dns_server" _cb_chk_ms
-    if [ -n "$_ms_list" ]; then
-        dns_server="${_ms_list%% *}"
-    else
+    PODKOP_DNS_MAIN_LIST=""
+    config_list_foreach "settings" "dns_server" _collect_dns_main
+    if [ -z "$PODKOP_DNS_MAIN_LIST" ]; then
         config_get dns_server "settings" "dns_server" "77.88.8.8"
+        PODKOP_DNS_MAIN_LIST="$dns_server"
     fi
 
-    local _bs_list=""
-    _cb_chk_bs() { [ -n "$1" ] && _bs_list="${_bs_list:+$_bs_list }$1"; }
-    config_list_foreach "settings" "bootstrap_dns_server" _cb_chk_bs
-    if [ -n "$_bs_list" ]; then
-        bootstrap_dns_server="${_bs_list%% *}"
-    else
+    PODKOP_DNS_BOOTSTRAP_LIST=""
+    config_list_foreach "settings" "bootstrap_dns_server" _collect_dns_bootstrap
+    if [ -z "$PODKOP_DNS_BOOTSTRAP_LIST" ]; then
         config_get bootstrap_dns_server "settings" "bootstrap_dns_server" "77.88.8.8"
+        PODKOP_DNS_BOOTSTRAP_LIST="$bootstrap_dns_server"
     fi
 
-    local dns_status=0
+    any=0
+    ok=1
+    for server in $PODKOP_DNS_MAIN_LIST; do
+        display="$(_mask_dns_server "$server")"
+        if _test_dns_server "$dns_type" "$server"; then
+            status=1
+            any=1
+        else
+            status=0
+            ok=0
+        fi
+        [ -z "$first_dns" ] && first_dns="$display"
+        dns_servers_json=$(printf '%s' "$dns_servers_json" | jq -c --arg server "$display" --argjson status "$status" '. + [{ server: $server, status: $status }]')
+    done
+    [ "$any" -eq 1 ] && [ "$ok" -eq 1 ] && dns_status=1
+    [ -z "$first_dns" ] && first_dns="$(_mask_dns_server "77.88.8.8")"
+
+    any=0
+    ok=1
+    for server in $PODKOP_DNS_BOOTSTRAP_LIST; do
+        display="$(_mask_dns_server "$server")"
+        if dig @"$server" "google.com" +timeout=2 +tries=1 > /dev/null 2>&1; then
+            status=1
+            any=1
+        else
+            status=0
+            ok=0
+        fi
+        [ -z "$first_bootstrap" ] && first_bootstrap="$display"
+        bootstrap_servers_json=$(printf '%s' "$bootstrap_servers_json" | jq -c --arg server "$display" --argjson status "$status" '. + [{ server: $server, status: $status }]')
+    done
+    [ "$any" -eq 1 ] && [ "$ok" -eq 1 ] && bootstrap_dns_status=1
+    [ -z "$first_bootstrap" ] && first_bootstrap="$(_mask_dns_server "77.88.8.8")"
+
     local dns_on_router=0
-    local bootstrap_dns_status=0
     local dhcp_config_status=1
-    local domain="google.com"
-
-    # Mask NextDNS ID if present
-    local display_dns_server="$dns_server"
-    if echo "$dns_server" | grep -q "\.dns\.nextdns\.io$"; then
-        local nextdns_id
-        nextdns_id=$(echo "$dns_server" | cut -d'.' -f1)
-        display_dns_server="$(echo "$nextdns_id" | sed 's/./*/g').dns.nextdns.io"
-    elif echo "$dns_server" | grep -q "^dns\.nextdns\.io/"; then
-        local masked_path
-        masked_path=$(echo "$dns_server" | cut -d'/' -f2- | sed 's/./*/g')
-        display_dns_server="dns.nextdns.io/$masked_path"
-    fi
-
-    if [ "$dns_type" = "doh" ]; then
-        # Check if dns_server already contains a path
-        local doh_path="/dns-query"
-        if echo "$dns_server" | grep -q "/"; then
-            # Path is already present, extract it
-            doh_path="/$(echo "$dns_server" | cut -d'/' -f2-)"
-            dns_server="$(echo "$dns_server" | cut -d'/' -f1)"
-        fi
-
-        if dig @"$dns_server" "$domain" +https="$doh_path" +timeout=2 +tries=1 > /dev/null 2>&1; then
-            dns_status=1
-        fi
-    elif [ "$dns_type" = "dot" ]; then
-        if dig @"$dns_server" "$domain" +tls +timeout=2 +tries=1 > /dev/null 2>&1; then
-            dns_status=1
-        fi
-    elif [ "$dns_type" = "udp" ]; then
-        if dig @"$dns_server" "$domain" +timeout=2 +tries=1 > /dev/null 2>&1; then
-            dns_status=1
-        fi
-    fi
 
     # Check if local DNS resolver is working
-    if dig @127.0.0.1 "$domain" +timeout=2 +tries=1 > /dev/null 2>&1; then
+    if dig @127.0.0.1 "google.com" +timeout=2 +tries=1 > /dev/null 2>&1; then
         dns_on_router=1
-    fi
-
-    # Check bootstrap DNS server
-    if [ -n "$bootstrap_dns_server" ]; then
-        if dig @"$bootstrap_dns_server" "$domain" +timeout=2 +tries=1 > /dev/null 2>&1; then
-            bootstrap_dns_status=1
-        fi
     fi
 
     # Check if /etc/config/dhcp has server 127.0.0.42
@@ -2415,7 +2458,27 @@ check_dns_available() {
     config_foreach check_dhcp_has_podkop_dns dnsmasq
     config_load "$PODKOP_CONFIG"
 
-    echo "{\"dns_type\":\"$dns_type\",\"dns_server\":\"$display_dns_server\",\"dns_status\":$dns_status,\"dns_on_router\":$dns_on_router,\"bootstrap_dns_server\":\"$bootstrap_dns_server\",\"bootstrap_dns_status\":$bootstrap_dns_status,\"dhcp_config_status\":$dhcp_config_status}" | jq .
+    jq -n \
+        --arg dns_type "$dns_type" \
+        --arg dns_server "$first_dns" \
+        --argjson dns_status "$dns_status" \
+        --argjson dns_on_router "$dns_on_router" \
+        --arg bootstrap_dns_server "$first_bootstrap" \
+        --argjson bootstrap_dns_status "$bootstrap_dns_status" \
+        --argjson dhcp_config_status "$dhcp_config_status" \
+        --argjson dns_servers "$dns_servers_json" \
+        --argjson bootstrap_dns_servers "$bootstrap_servers_json" \
+        '{
+            dns_type: $dns_type,
+            dns_server: $dns_server,
+            dns_status: $dns_status,
+            dns_on_router: $dns_on_router,
+            bootstrap_dns_server: $bootstrap_dns_server,
+            bootstrap_dns_status: $bootstrap_dns_status,
+            dhcp_config_status: $dhcp_config_status,
+            dns_servers: $dns_servers,
+            bootstrap_dns_servers: $bootstrap_dns_servers
+        }'
 }
 
 check_dhcp_has_podkop_dns() {

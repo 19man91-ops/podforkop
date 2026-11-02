@@ -1581,3 +1581,7 @@ msgstr ""
 msgid "Failed to restart Podkop service. The changes are saved; run service podkop restart manually."
 msgstr ""
 
+
+msgid "Bootstrap DNS"
+msgstr ""
+
