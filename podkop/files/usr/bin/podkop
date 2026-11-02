@@ -3542,9 +3542,19 @@ get_config_status() {
     config_file="$config_path"
     uci_file="/etc/config/podkop"
 
-    uci_mtime=$(stat -c %Y "$uci_file" 2> /dev/null || echo 0)
-    config_mtime=$(stat -c %Y "$config_file" 2> /dev/null || echo 0)
-    [ "$uci_mtime" -gt "$config_mtime" ] && stale=1
+    # OpenWrt's BusyBox may not include "stat"; "date -r" is available in
+    # BusyBox and gives the mtime in seconds. Fall back to test -nt.
+    uci_mtime=$(date -r "$uci_file" +%s 2> /dev/null || echo 0)
+    config_mtime=$(date -r "$config_file" +%s 2> /dev/null || echo 0)
+
+    case "$uci_mtime" in '' | *[!0-9]*) uci_mtime=0 ;; esac
+    case "$config_mtime" in '' | *[!0-9]*) config_mtime=0 ;; esac
+
+    if [ "$uci_mtime" -gt 0 ] && [ "$config_mtime" -gt 0 ]; then
+        [ "$uci_mtime" -gt "$config_mtime" ] && stale=1
+    elif [ "$uci_file" -nt "$config_file" ]; then
+        stale=1
+    fi
 
     jq -n --argjson stale "$stale" --argjson uci_mtime "$uci_mtime" --argjson config_mtime "$config_mtime" '{
         stale: ($stale == 1),
