@@ -3548,8 +3548,8 @@ update_to_latest() {
 }
 
 get_config_status() {
-    local config_path config_file uci_file uci_mtime config_mtime stale=0
-    local uci_hash applied_hash
+    local config_path config_file uci_file stale=0
+    local uci_mtime=0 config_mtime=0 uci_hash="" applied_hash=""
 
     config_get config_path "settings" "config_path"
     [ -n "$config_path" ] || config_path="/etc/sing-box/config.json"

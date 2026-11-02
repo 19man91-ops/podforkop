@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.16
+
+### Исправлено
+- **Hotfix `get_config_status`:** незаполненные переменные `uci_mtime`/`config_mtime` передавались в `jq --argjson`
+  и вызывали ошибку «invalid JSON text passed to --argjson». Переменные инициализируются нулями,
+  проверка по SHA256 работает корректно.
+- **Проверено end-to-end на роутере:** изменение UCI → `stale: true`; `/sbin/reload_config`
+  (путь LuCI Save & Apply) → Podkop перезапускается, конфиг применяется, `stale: false`;
+  возврат настройки — снова `stale: false`. Серверный триггер работает без участия браузера.
+
 ## 0.9.15
 
 ### Исправлено
