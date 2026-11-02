@@ -25,12 +25,7 @@ import {
 } from './connectionList';
 import { formatEndpoint } from './endpoint';
 import { closeConnections } from './closeConnections';
-import {
-  compareSources,
-  ConnectionSource,
-  describeSource,
-  sourceLabel,
-} from './source';
+import { compareSources, ConnectionSource, describeSource } from './source';
 
 type MonitoringTabId = 'active' | 'closed';
 
@@ -105,6 +100,7 @@ let selectedRouteFilter = ALL_FILTER_VALUE;
 let searchQuery = '';
 let connectionSort: ConnectionListSort | null = null;
 let localDeviceNames: Record<string, string> = {};
+let localDeviceMacs: Record<string, string> = {};
 let routeLabels: Record<string, string> = {};
 let sectionTags: string[] = [];
 let sectionTagsLongestFirst: string[] = [];
@@ -214,6 +210,7 @@ function formatBytes(value?: number): string {
 function getSource(connection: ClashConnection): ConnectionSource {
   return describeSource(connection, {
     devices: localDeviceNames,
+    macs: localDeviceMacs,
     servers: serverInboundTags,
     clients: serverClientNames,
   });
@@ -492,7 +489,7 @@ function getKnownRoutes(): ConnectionRoute[] {
 function renderFilterOptions(
   id: string,
   allLabel: string,
-  options: Array<{ value: string; label: string }>,
+  options: Array<{ value: string; label: string; title?: string }>,
   selected: string,
 ): string {
   const value = options.some((option) => option.value === selected)
@@ -507,7 +504,11 @@ function renderFilterOptions(
     select.replaceChildren(
       E('option', { value: ALL_FILTER_VALUE }, allLabel),
       ...options.map((option) =>
-        E('option', { value: option.value }, option.label),
+        E(
+          'option',
+          { value: option.value, title: option.title || option.label },
+          option.label,
+        ),
       ),
     );
   }
@@ -516,13 +517,34 @@ function renderFilterOptions(
   return value;
 }
 
+function sourceFilterLabel(source: ConnectionSource): string {
+  const parts: string[] = [];
+
+  if (source.name) {
+    parts.push(source.name);
+  }
+  parts.push(source.detail || source.key);
+
+  if (source.mac && !source.name) {
+    parts.push(source.mac);
+  }
+  if (source.vendor) {
+    parts.push(source.vendor);
+  }
+
+  return parts.filter(Boolean).join(' · ');
+}
+
 function renderFilters() {
   selectedDeviceFilter = renderFilterOptions(
     'monitoring-device-filter',
     _('All devices'),
     getKnownSources().map((source) => ({
       value: source.key,
-      label: sourceLabel(source.name, source.detail),
+      label: sourceFilterLabel(source),
+      title: source.mac
+        ? `${sourceFilterLabel(source)} · ${source.mac}`
+        : sourceFilterLabel(source),
     })),
     selectedDeviceFilter,
   );
@@ -1035,10 +1057,13 @@ function bindControls() {
 
 async function loadLocalDeviceNames() {
   try {
-    localDeviceNames = (await loadLocalDevices()).names;
+    const localDevices = await loadLocalDevices();
+    localDeviceNames = localDevices.names;
+    localDeviceMacs = localDevices.macs || {};
   } catch (error) {
     logger.warn('[MONITORING]', 'loadLocalDeviceNames: failed', error);
     localDeviceNames = {};
+    localDeviceMacs = {};
   } finally {
     renderControls();
     renderConnections();

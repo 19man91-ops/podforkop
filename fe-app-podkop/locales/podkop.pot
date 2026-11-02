@@ -1651,3 +1651,7 @@ msgstr ""
 msgid "The configuration was saved but Podkop could not apply it automatically. Run service podkop restart on the router and check the logs."
 msgstr ""
 
+
+msgid "Private MAC"
+msgstr ""
+

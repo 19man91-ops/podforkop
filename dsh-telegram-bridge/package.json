@@ -1,0 +1,25 @@
+{
+  "name": "@local/dsh-telegram-bridge",
+  "version": "1.0.0",
+  "description": "Two-way Telegram bridge: mirror DeepSeek Harness sessions into Telegram chats and chat with the agent from Telegram.",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

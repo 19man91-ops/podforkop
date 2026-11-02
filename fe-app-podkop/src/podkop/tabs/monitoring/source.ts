@@ -7,8 +7,15 @@ export interface SourceConnection {
   rule?: string;
 }
 
+import {
+  getMacVendor,
+  isLocallyAdministeredMac,
+  normalizeMac,
+} from '../../../helpers/macVendor';
+
 export interface SourceNames {
   devices: Record<string, string>;
+  macs?: Record<string, string>;
   servers: Set<string>;
   clients: Record<string, Record<string, string>>;
 }
@@ -22,6 +29,8 @@ export interface ConnectionSource {
   detail: string;
   server: string;
   search: string;
+  mac?: string;
+  vendor?: string;
 }
 
 const SYSTEM_SOURCE_KEY = '@system';
@@ -95,13 +104,21 @@ export function describeSource(
   }
 
   const name = text(names.devices[ip]);
+  const mac = normalizeMac(names.macs?.[ip]);
+  const vendor = mac
+    ? isLocallyAdministeredMac(mac)
+      ? _('Private MAC')
+      : getMacVendor(mac)
+    : '';
   return {
     key: ip,
     kind: 'device',
     name,
     detail: ip,
     server: '',
-    search: search(name),
+    search: search(name, mac, vendor, mac.replace(/:/g, '')),
+    mac,
+    vendor,
   };
 }
 

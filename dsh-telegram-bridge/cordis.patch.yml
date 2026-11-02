@@ -1,0 +1,19 @@
+# Inserts the Telegram bridge Host plugin into this profile.
+# Runtime options (token file path, state dir) may be overridden by editing
+# `config` below; the defaults live under ~/.dsh/telegram-bridge/.
+- insert:
+    - id: telegram-bridge
+      name: '@local/dsh-telegram-bridge'
+      config:
+        # One-time pairing code required in `/start <code>` before the bot
+        # accepts messages from a Telegram account.
+        pairingCode: '3QRVHG'
+        # Mirror every ordinary (non-subagent) session into Telegram:
+        #   all    — every chat, each message prefixed with its title
+        #   active — only the currently selected chat
+        mirrorMode: all
+        # Automatically link new session activity to the primary Telegram chat
+        # (and create a forum topic for it in a forum supergroup).
+        autoLink: true
+        # Forward prompts typed in the Web GUI into Telegram as well.
+        mirrorUserMessages: true

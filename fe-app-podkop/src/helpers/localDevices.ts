@@ -1,4 +1,5 @@
 import { validateIP } from '../validators';
+import { normalizeMac } from './macVendor';
 
 type RpcCallFn = () => Promise<unknown>;
 
@@ -10,6 +11,7 @@ interface HostHintRecord {
   name?: string;
   ipaddrs?: string[];
   ip6addrs?: string[];
+  macaddrs?: string[];
 }
 
 interface DHCPLeasesPayload {
@@ -20,11 +22,14 @@ interface DHCPLeasesPayload {
 interface DHCPLeaseRecord {
   hostname?: string;
   ipaddr?: string;
+  macaddr?: string;
+  mac?: string;
 }
 
 interface StaticHostRecord {
   name?: string;
   ip?: string;
+  mac?: string;
 }
 
 interface NetworkInterfaceAddress {
@@ -123,6 +128,7 @@ function initRpcCalls(): void {
 
 export interface LocalDevices {
   names: Record<string, string>;
+  macs: Record<string, string>;
 }
 
 let localDevicesCache: LocalDevices | null = null;
@@ -198,6 +204,7 @@ export function loadLocalDevices(): Promise<LocalDevices> {
         leasesContent,
       ]) => {
         const names: Record<string, string> = {};
+        const macs: Record<string, string> = {};
 
         // Parse direct /tmp/dhcp.leases file (standard dnsmasq format: timestamp mac ip hostname client-id)
         if (typeof leasesContent === 'string' && leasesContent) {
@@ -206,6 +213,10 @@ export function loadLocalDevices(): Promise<LocalDevices> {
             if (parts.length >= 4) {
               const ip = parts[2];
               const hostname = parts[3];
+              const mac = normalizeMac(parts[1]);
+              if (ip && mac && validateIP(ip).valid) {
+                macs[ip] = mac;
+              }
               if (ip && hostname && hostname !== '*' && validateIP(ip).valid) {
                 names[ip] = normalizeName(hostname);
               }
@@ -219,13 +230,17 @@ export function loadLocalDevices(): Promise<LocalDevices> {
             (hint) => {
               if (!hint || typeof hint !== 'object') return;
               const name = normalizeName(hint.name);
-              if (!name) return;
               const ipaddrs = [
                 ...(Array.isArray(hint.ipaddrs) ? hint.ipaddrs : []),
                 ...(Array.isArray(hint.ip6addrs) ? hint.ip6addrs : []),
               ];
+              const hintMac = normalizeMac(
+                Array.isArray(hint.macaddrs) ? hint.macaddrs[0] : '',
+              );
               ipaddrs.forEach((ip: string) => {
-                if (ip && validateIP(ip).valid) names[ip] = name;
+                if (!ip || !validateIP(ip).valid) return;
+                if (name) names[ip] = name;
+                if (hintMac) macs[ip] = hintMac;
               });
             },
           );
@@ -241,6 +256,8 @@ export function loadLocalDevices(): Promise<LocalDevices> {
             if (!lease || typeof lease !== 'object') return;
             const name = normalizeName(lease.hostname);
             const ip = `${lease.ipaddr || ''}`.trim();
+            const mac = normalizeMac(lease.macaddr || lease.mac);
+            if (ip && mac && validateIP(ip).valid) macs[ip] = mac;
             if (ip && name && validateIP(ip).valid) names[ip] = name;
           });
         }
@@ -251,6 +268,8 @@ export function loadLocalDevices(): Promise<LocalDevices> {
             if (!host || typeof host !== 'object') return;
             const name = normalizeName(host.name);
             const ip = `${host.ip || ''}`.trim();
+            const mac = normalizeMac(host.mac);
+            if (ip && mac && validateIP(ip).valid) macs[ip] = mac;
             if (ip && name && validateIP(ip).valid) names[ip] = name;
           });
         }
@@ -274,15 +293,18 @@ export function loadLocalDevices(): Promise<LocalDevices> {
               if (ip && names[ip]) {
                 delete names[ip];
               }
+              if (ip && macs[ip]) {
+                delete macs[ip];
+              }
             });
           });
         }
 
-        localDevicesCache = { names };
+        localDevicesCache = { names, macs };
         return localDevicesCache;
       },
     )
-    .catch(() => ({ names: {} }))
+    .catch(() => ({ names: {}, macs: {} }))
     .finally(() => {
       localDevicesPromise = null;
     });

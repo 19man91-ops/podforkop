@@ -6619,6 +6619,319 @@ function createTabLifecycle(options) {
   };
 }
 
+// src/helpers/macVendor.ts
+var OUI_VENDORS = {
+  // Apple
+  "001B63": "Apple",
+  "001EC2": "Apple",
+  "001F5B": "Apple",
+  "0023DF": "Apple",
+  "002500": "Apple",
+  "0026BB": "Apple",
+  "283737": "Apple",
+  "3C0754": "Apple",
+  "442A60": "Apple",
+  "542696": "Apple",
+  "60334B": "Apple",
+  "787B8A": "Apple",
+  "8C8590": "Apple",
+  "985AEB": "Apple",
+  A483E7: "Apple",
+  ACBC32: "Apple",
+  B817C2: "Apple",
+  C0847A: "Apple",
+  D0817A: "Apple",
+  E0B9BA: "Apple",
+  F01898: "Apple",
+  F45C89: "Apple",
+  // Samsung
+  "0012FB": "Samsung",
+  "001599": "Samsung",
+  "001632": "Samsung",
+  "001D25": "Samsung",
+  "002119": "Samsung",
+  "0023D6": "Samsung",
+  "08373D": "Samsung",
+  "101DC0": "Samsung",
+  "28CC01": "Samsung",
+  "342387": "Samsung",
+  "3C5A37": "Samsung",
+  "400E85": "Samsung",
+  "48137E": "Samsung",
+  "503275": "Samsung",
+  "5C0A5B": "Samsung",
+  "68EBAE": "Samsung",
+  "781FDB": "Samsung",
+  "88329B": "Samsung",
+  "94350A": "Samsung",
+  A0821F: "Samsung",
+  B0DF3A: "Samsung",
+  C819F7: "Samsung",
+  D022BE: "Samsung",
+  E83EB0: "Samsung",
+  F49F54: "Samsung",
+  // Xiaomi
+  "286C07": "Xiaomi",
+  "34CE00": "Xiaomi",
+  "3CBDD8": "Xiaomi",
+  "50642B": "Xiaomi",
+  "640980": "Xiaomi",
+  "68DFDD": "Xiaomi",
+  "7811DC": "Xiaomi",
+  "8CBEBE": "Xiaomi",
+  "98FAE3": "Xiaomi",
+  A086C6: "Xiaomi",
+  ACC1EE: "Xiaomi",
+  B0E235: "Xiaomi",
+  C40BCB: "Xiaomi",
+  D4970B: "Xiaomi",
+  F0B429: "Xiaomi",
+  FC64BA: "Xiaomi",
+  // Huawei
+  "009ACD": "Huawei",
+  "00E0FC": "Huawei",
+  "04BD70": "Huawei",
+  "0819A6": "Huawei",
+  "0C37DC": "Huawei",
+  "104780": "Huawei",
+  "20F3A3": "Huawei",
+  "283152": "Huawei",
+  "2C55D3": "Huawei",
+  "346BD3": "Huawei",
+  "404D8E": "Huawei",
+  "48DB50": "Huawei",
+  "5425EA": "Huawei",
+  "5C7D5E": "Huawei",
+  "60DE44": "Huawei",
+  "643E8C": "Huawei",
+  "68A0F6": "Huawei",
+  "70723C": "Huawei",
+  "781DFA": "Huawei",
+  "84A8E4": "Huawei",
+  "8853D4": "Huawei",
+  "90671C": "Huawei",
+  "94049C": "Huawei",
+  A08CF8: "Huawei",
+  ACE215: "Huawei",
+  B05B67: "Huawei",
+  C894BB: "Huawei",
+  D07AB5: "Huawei",
+  E0247F: "Huawei",
+  F48E38: "Huawei",
+  FC48EF: "Huawei",
+  // OPPO
+  "2C5BB8": "OPPO",
+  "30766F": "OPPO",
+  "3C1E04": "OPPO",
+  "404E36": "OPPO",
+  "482CA0": "OPPO",
+  "508BB9": "OPPO",
+  "542A1B": "OPPO",
+  "584BBC": "OPPO",
+  "64CC2E": "OPPO",
+  "6C5AB0": "OPPO",
+  "703ACB": "OPPO",
+  "742344": "OPPO",
+  "7C1C4E": "OPPO",
+  "803F5D": "OPPO",
+  "8C1D96": "OPPO",
+  "94652D": "OPPO",
+  "985B8F": "OPPO",
+  A01B29: "OPPO",
+  A4B1C1: "OPPO",
+  A816B2: "OPPO",
+  AC1F6B: "OPPO",
+  B00C9D: "OPPO",
+  B41DEF: "OPPO",
+  B83A5E: "OPPO",
+  C0EEFB: "OPPO",
+  C83DD4: "OPPO",
+  D07DE0: "OPPO",
+  D43D67: "OPPO",
+  D89E3F: "OPPO",
+  E0BB9E: "OPPO",
+  E45AA2: "OPPO",
+  EC5C68: "OPPO",
+  F02572: "OPPO",
+  F41F88: "OPPO",
+  F85C4D: "OPPO",
+  FC1A11: "OPPO",
+  // vivo
+  "041BBA": "vivo",
+  "086D41": "vivo",
+  "10521C": "vivo",
+  "185936": "vivo",
+  "200CC8": "vivo",
+  "2C3A5E": "vivo",
+  "307496": "vivo",
+  "3859F9": "vivo",
+  "3CBBFD": "vivo",
+  "442C05": "vivo",
+  "488EEF": "vivo",
+  "5057A8": "vivo",
+  "544A16": "vivo",
+  "580205": "vivo",
+  "608C4B": "vivo",
+  "649EF3": "vivo",
+  "68DBCA": "vivo",
+  "6C8DC1": "vivo",
+  "70F96D": "vivo",
+  "7802F8": "vivo",
+  "7C1DD9": "vivo",
+  "80EA0C": "vivo",
+  "843835": "vivo",
+  "8828B3": "vivo",
+  "8C8B83": "vivo",
+  "9075BC": "vivo",
+  "947BE7": "vivo",
+  "98E7F5": "vivo",
+  "9C2E9E": "vivo",
+  A08C15: "vivo",
+  A490CE: "vivo",
+  A89CED: "vivo",
+  AC61EA: "vivo",
+  B07C8B: "vivo",
+  B40B44: "vivo",
+  B85F98: "vivo",
+  BC5A56: "vivo",
+  C00F60: "vivo",
+  C4D61D: "vivo",
+  C80F0E: "vivo",
+  CC7404: "vivo",
+  D003DF: "vivo",
+  D45C70: "vivo",
+  D8160A: "vivo",
+  E01D3B: "vivo",
+  E4608C: "vivo",
+  E86D52: "vivo",
+  ECDF3A: "vivo",
+  F05A09: "vivo",
+  // IoT / chips
+  "84B4D2": "Shenzhen iComm Semiconductor",
+  "240AC4": "Espressif",
+  "2462AB": "Espressif",
+  "30AEA4": "Espressif",
+  "3C6105": "Espressif",
+  "3C71BF": "Espressif",
+  "409151": "Espressif",
+  "441793": "Espressif",
+  "483FDA": "Espressif",
+  "4C11AE": "Espressif",
+  "545AA6": "Espressif",
+  "5CCF7F": "Espressif",
+  "600194": "Espressif",
+  "68C63A": "Espressif",
+  "70039F": "Espressif",
+  "7C9EBD": "Espressif",
+  "80646F": "Espressif",
+  "840D8E": "Espressif",
+  "84CCA8": "Espressif",
+  "8CAAB5": "Espressif",
+  "90380C": "Espressif",
+  "94B97E": "Espressif",
+  "98F4AB": "Espressif",
+  A020A6: "Espressif",
+  A4CF12: "Espressif",
+  AC67B2: "Espressif",
+  B4E62D: "Espressif",
+  B8F009: "Espressif",
+  BCDDC2: "Espressif",
+  C44F33: "Espressif",
+  C82B96: "Espressif",
+  CC50E3: "Espressif",
+  D8A01D: "Espressif",
+  DC4F22: "Espressif",
+  E09806: "Espressif",
+  E868E7: "Espressif",
+  ECFABC: "Espressif",
+  F008D1: "Espressif",
+  F4CFA2: "Espressif",
+  FCF5C4: "Espressif",
+  B827EB: "Raspberry Pi",
+  DCA632: "Raspberry Pi",
+  E45F01: "Raspberry Pi",
+  "2CCF67": "Raspberry Pi",
+  // Network / PC
+  "001D0F": "TP-Link",
+  "0023CD": "TP-Link",
+  "002586": "TP-Link",
+  "002719": "TP-Link",
+  "085700": "TP-Link",
+  "1027F5": "TP-Link",
+  "14CC20": "TP-Link",
+  "18A6F7": "TP-Link",
+  "1C3BF3": "TP-Link",
+  "246968": "TP-Link",
+  "30B5C2": "TP-Link",
+  "3460F9": "TP-Link",
+  "3C46D8": "TP-Link",
+  "40169F": "TP-Link",
+  "4494FC": "TP-Link",
+  "50C7BF": "TP-Link",
+  "54C80F": "TP-Link",
+  "5C899A": "TP-Link",
+  "6032B1": "TP-Link",
+  "60A4B7": "TP-Link",
+  "645601": "TP-Link",
+  "6466B3": "TP-Link",
+  "68FF7B": "TP-Link",
+  "704F57": "TP-Link",
+  "74DA88": "TP-Link",
+  "788CB5": "TP-Link",
+  "7C8BCA": "TP-Link",
+  "8416F9": "TP-Link",
+  "882593": "TP-Link",
+  "8C210A": "TP-Link",
+  "90F652": "TP-Link",
+  "940C6D": "TP-Link",
+  "98DAC4": "TP-Link",
+  "9CA2F4": "TP-Link",
+  A040A0: "TP-Link",
+  A42BB0: "TP-Link",
+  A8574E: "TP-Link",
+  AC84C6: "TP-Link",
+  B04E26: "TP-Link",
+  "001B21": "Intel",
+  "001E64": "Intel",
+  "00216A": "Intel",
+  "0024D7": "Intel",
+  "3CA9F4": "Intel",
+  "7C7A91": "Intel",
+  "8C1645": "Intel",
+  A0369F: "Intel",
+  B46BFC: "Intel",
+  D8FC93: "Intel",
+  F81654: "Intel",
+  "001DD8": "Microsoft",
+  "0017FA": "Microsoft",
+  "3C2EFF": "Microsoft",
+  "7C1E52": "Microsoft",
+  C83F26: "Microsoft",
+  "001E75": "LG Electronics",
+  "2C54CF": "LG Electronics",
+  "3C3A4D": "LG Electronics",
+  "5C497D": "LG Electronics",
+  "88074B": "LG Electronics",
+  "001A11": "Google",
+  "3C5AB4": "Google",
+  F4F5D8: "Google",
+  A47733: "Google"
+};
+function normalizeMac(value) {
+  const raw = `${value || ""}`.trim().toLowerCase().replace(/[^0-9a-f]/g, "");
+  if (raw.length !== 12) return "";
+  return raw.match(/.{2}/g).join(":").toUpperCase();
+}
+function isLocallyAdministeredMac(mac) {
+  const first = parseInt((mac || "").split(":")[0], 16);
+  return Number.isFinite(first) && (first & 2) !== 0;
+}
+function getMacVendor(mac) {
+  const normalized = normalizeMac(mac);
+  if (!normalized) return "";
+  return OUI_VENDORS[normalized.slice(0, 8).replace(/:/g, "")] || "";
+}
+
 // src/helpers/localDevices.ts
 var callHostHints;
 var callDHCPLeases;
@@ -6704,12 +7017,17 @@ function loadLocalDevices() {
       leasesContent
     ]) => {
       const names = {};
+      const macs = {};
       if (typeof leasesContent === "string" && leasesContent) {
         leasesContent.split("\n").forEach((line) => {
           const parts = line.trim().split(/\s+/);
           if (parts.length >= 4) {
             const ip = parts[2];
             const hostname = parts[3];
+            const mac = normalizeMac(parts[1]);
+            if (ip && mac && validateIP(ip).valid) {
+              macs[ip] = mac;
+            }
             if (ip && hostname && hostname !== "*" && validateIP(ip).valid) {
               names[ip] = normalizeName(hostname);
             }
@@ -6721,13 +7039,17 @@ function loadLocalDevices() {
           (hint) => {
             if (!hint || typeof hint !== "object") return;
             const name = normalizeName(hint.name);
-            if (!name) return;
             const ipaddrs = [
               ...Array.isArray(hint.ipaddrs) ? hint.ipaddrs : [],
               ...Array.isArray(hint.ip6addrs) ? hint.ip6addrs : []
             ];
+            const hintMac = normalizeMac(
+              Array.isArray(hint.macaddrs) ? hint.macaddrs[0] : ""
+            );
             ipaddrs.forEach((ip) => {
-              if (ip && validateIP(ip).valid) names[ip] = name;
+              if (!ip || !validateIP(ip).valid) return;
+              if (name) names[ip] = name;
+              if (hintMac) macs[ip] = hintMac;
             });
           }
         );
@@ -6738,6 +7060,8 @@ function loadLocalDevices() {
           if (!lease || typeof lease !== "object") return;
           const name = normalizeName(lease.hostname);
           const ip = `${lease.ipaddr || ""}`.trim();
+          const mac = normalizeMac(lease.macaddr || lease.mac);
+          if (ip && mac && validateIP(ip).valid) macs[ip] = mac;
           if (ip && name && validateIP(ip).valid) names[ip] = name;
         });
       }
@@ -6746,6 +7070,8 @@ function loadLocalDevices() {
           if (!host || typeof host !== "object") return;
           const name = normalizeName(host.name);
           const ip = `${host.ip || ""}`.trim();
+          const mac = normalizeMac(host.mac);
+          if (ip && mac && validateIP(ip).valid) macs[ip] = mac;
           if (ip && name && validateIP(ip).valid) names[ip] = name;
         });
       }
@@ -6761,13 +7087,16 @@ function loadLocalDevices() {
             if (ip && names[ip]) {
               delete names[ip];
             }
+            if (ip && macs[ip]) {
+              delete macs[ip];
+            }
           });
         });
       }
-      localDevicesCache = { names };
+      localDevicesCache = { names, macs };
       return localDevicesCache;
     }
-  ).catch(() => ({ names: {} })).finally(() => {
+  ).catch(() => ({ names: {}, macs: {} })).finally(() => {
     localDevicesPromise = null;
   });
   return localDevicesPromise;
@@ -6828,13 +7157,17 @@ function describeSource(connection, names) {
     };
   }
   const name = text(names.devices[ip]);
+  const mac = normalizeMac(names.macs?.[ip]);
+  const vendor = mac ? isLocallyAdministeredMac(mac) ? _("Private MAC") : getMacVendor(mac) : "";
   return {
     key: ip,
     kind: "device",
     name,
     detail: ip,
     server: "",
-    search: search(name)
+    search: search(name, mac, vendor, mac.replace(/:/g, "")),
+    mac,
+    vendor
   };
 }
 function compareSources(a, b) {
@@ -7248,6 +7581,7 @@ var selectedRouteFilter = ALL_FILTER_VALUE;
 var searchQuery = "";
 var connectionSort = null;
 var localDeviceNames = {};
+var localDeviceMacs = {};
 var routeLabels = {};
 var sectionTags = [];
 var sectionTagsLongestFirst = [];
@@ -7333,6 +7667,7 @@ function formatBytes(value) {
 function getSource(connection) {
   return describeSource(connection, {
     devices: localDeviceNames,
+    macs: localDeviceMacs,
     servers: serverInboundTags,
     clients: serverClientNames
   });
@@ -7538,12 +7873,30 @@ function renderFilterOptions(id, allLabel, options, selected) {
     select.replaceChildren(
       element("option", { value: ALL_FILTER_VALUE }, allLabel),
       ...options.map(
-        (option) => element("option", { value: option.value }, option.label)
+        (option) => element(
+          "option",
+          { value: option.value, title: option.title || option.label },
+          option.label
+        )
       )
     );
   }
   select.value = value;
   return value;
+}
+function sourceFilterLabel(source) {
+  const parts = [];
+  if (source.name) {
+    parts.push(source.name);
+  }
+  parts.push(source.detail || source.key);
+  if (source.mac && !source.name) {
+    parts.push(source.mac);
+  }
+  if (source.vendor) {
+    parts.push(source.vendor);
+  }
+  return parts.filter(Boolean).join(" \xB7 ");
 }
 function renderFilters() {
   selectedDeviceFilter = renderFilterOptions(
@@ -7551,7 +7904,8 @@ function renderFilters() {
     _("All devices"),
     getKnownSources().map((source) => ({
       value: source.key,
-      label: sourceLabel(source.name, source.detail)
+      label: sourceFilterLabel(source),
+      title: source.mac ? `${sourceFilterLabel(source)} \xB7 ${source.mac}` : sourceFilterLabel(source)
     })),
     selectedDeviceFilter
   );
@@ -7983,10 +8337,13 @@ function bindControls() {
 }
 async function loadLocalDeviceNames() {
   try {
-    localDeviceNames = (await loadLocalDevices()).names;
+    const localDevices = await loadLocalDevices();
+    localDeviceNames = localDevices.names;
+    localDeviceMacs = localDevices.macs || {};
   } catch (error) {
     logger.warn("[MONITORING]", "loadLocalDeviceNames: failed", error);
     localDeviceNames = {};
+    localDeviceMacs = {};
   } finally {
     renderControls();
     renderConnections();

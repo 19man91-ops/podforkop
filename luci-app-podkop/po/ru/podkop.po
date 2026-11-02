@@ -1302,3 +1302,7 @@ msgstr "Перезапуск Podkop и применение конфигурац
 msgid "The configuration was saved but Podkop could not apply it automatically. Run service podkop restart on the router and check the logs."
 msgstr "Конфигурация сохранена, но Podkop не смог применить её автоматически. Выполните service podkop restart на роутере и проверьте логи."
 
+
+msgid "Private MAC"
+msgstr "Приватный MAC"
+
