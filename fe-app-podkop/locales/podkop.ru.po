@@ -1286,3 +1286,19 @@ msgstr "Нажмите Save & Apply, чтобы перегенерировать
 msgid "Settings are saved but not applied. "
 msgstr "Настройки сохранены, но не применены. "
 
+
+msgid "Apply now"
+msgstr "Применить сейчас"
+
+msgid "Configuration applied: sing-box config was regenerated and the service restarted."
+msgstr "Конфигурация применена: конфиг sing-box перегенерирован, служба перезапущена."
+
+msgid "Failed to restart Podkop service. Run service podkop restart on the router."
+msgstr "Не удалось перезапустить Podkop. Выполните service podkop restart на роутере."
+
+msgid "Restarting Podkop service and applying the configuration..."
+msgstr "Перезапуск Podkop и применение конфигурации..."
+
+msgid "The configuration was saved but Podkop could not apply it automatically. Run service podkop restart on the router and check the logs."
+msgstr "Конфигурация сохранена, но Podkop не смог применить её автоматически. Выполните service podkop restart на роутере и проверьте логи."
+

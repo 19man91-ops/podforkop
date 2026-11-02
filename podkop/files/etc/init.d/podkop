@@ -15,7 +15,10 @@ start_service() {
     config_get badwan_monitored_interfaces "settings" "badwan_monitored_interfaces"
 
     procd_open_instance
-    procd_set_param command /usr/bin/podkop start
+    # Keep a procd instance alive. This makes /etc/config/podkop triggers
+    # (procd_add_reload_trigger) work reliably: a Save & Apply in LuCI sends
+    # config.change and procd runs "reload", even if the browser JS failed.
+    procd_set_param command /bin/sh -c "/usr/bin/podkop start; exec sleep 86400"
     [ "$enable_badwan_interface_monitoring" = "1" ] && [ -n "$badwan_monitored_interfaces" ] &&
         procd_set_param netdev "$badwan_monitored_interfaces"
     procd_set_param stdout 1
@@ -41,10 +44,13 @@ service_triggers() {
     PROCD_RELOAD_DELAY=$badwan_reload_delay
 
     procd_open_trigger
-    # Do not register a reload trigger for /etc/config/podkop: the LuCI
-    # Save & Apply handler already restarts the service explicitly, and the
-    # reload trigger caused a second full restart (and races in nftables /
-    # dnsmasq) on every apply. CLI users keep "service podkop reload".
+    # Restart Podkop after any apply of /etc/config/podkop. This is the
+    # server-side guarantee that Save & Apply regenerates the sing-box config:
+    # LuCI/reload_config sends config.change, procd runs "reload", and
+    # reload_service calls "/usr/bin/podkop restart" once. The LuCI JS handler
+    # only verifies the result and retries if this did not happen.
+    procd_add_reload_trigger "podkop"
+
     # The badwan interface triggers below are still required.
 
     if [ "$enable_badwan_interface_monitoring" = "1" ]; then

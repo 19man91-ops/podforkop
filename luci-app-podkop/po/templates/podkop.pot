@@ -1629,3 +1629,19 @@ msgstr ""
 msgid "Settings are saved but not applied. "
 msgstr ""
 
+
+msgid "Apply now"
+msgstr ""
+
+msgid "Configuration applied: sing-box config was regenerated and the service restarted."
+msgstr ""
+
+msgid "Failed to restart Podkop service. Run service podkop restart on the router."
+msgstr ""
+
+msgid "Restarting Podkop service and applying the configuration..."
+msgstr ""
+
+msgid "The configuration was saved but Podkop could not apply it automatically. Run service podkop restart on the router and check the logs."
+msgstr ""
+

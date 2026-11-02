@@ -522,6 +522,39 @@ const EntryPoint = {
               "Click Save & Apply to regenerate the sing-box configuration and restart Podkop.",
             ),
           ),
+          E(
+            "button",
+            {
+              class: "btn cbi-button cbi-button-apply",
+              click: async () => {
+                ui.showModal(_("Applying changes"), [
+                  E(
+                    "p",
+                    { class: "spinning" },
+                    _("Restarting Podkop service..."),
+                  ),
+                ]);
+                try {
+                  await fs.exec("/etc/init.d/podkop", ["restart"]);
+                  window.location.reload();
+                } catch (e) {
+                  ui.hideModal();
+                  ui.addNotification(
+                    null,
+                    E(
+                      "p",
+                      {},
+                      _(
+                        "Failed to restart Podkop service. Run service podkop restart on the router.",
+                      ),
+                    ),
+                    "error",
+                  );
+                }
+              },
+            },
+            _("Apply now"),
+          ),
         ]);
       }
     } catch (e) {
@@ -535,7 +568,14 @@ const EntryPoint = {
   },
 
   handleSaveApply(ev, mode) {
-    return this.handleSave(ev).then(() => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const readConfigStatus = async () => {
+      const result = await fs.exec("/usr/bin/podkop", ["get_config_status"]);
+      return JSON.parse(result?.stdout || "{}");
+    };
+
+    return this.handleSave(ev).then(async () => {
       ui.showModal(_("Applying changes"), [
         E(
           "p",
@@ -544,43 +584,110 @@ const EntryPoint = {
         ),
       ]);
 
-      return ui.changes
-        .apply(mode == "0")
-        .then(() => {
-          ui.showModal(_("Restarting service"), [
-            E("p", { class: "spinning" }, _("Restarting Podkop service...")),
-          ]);
-          return fs
-            .exec("/etc/init.d/podkop", ["restart"])
-            .catch((err) => {
-              console.error("Podkop restart failed", err);
-              ui.hideModal();
-              ui.addNotification(
-                null,
-                E(
-                  "p",
-                  {},
-                  _(
-                    "Failed to restart Podkop service. The changes are saved; run service podkop restart manually.",
-                  ),
-                ),
-                "error",
-              );
-            })
-            .finally(() => {
-              ui.hideModal();
-            });
-        })
-        .catch((err) => {
-          ui.hideModal();
-          ui.addNotification(
-            null,
-            E("p", {}, err ? err.message : _("Failed to apply changes")),
-            "error",
-          );
-        });
+      try {
+        await ui.changes.apply(mode == "0");
+      } catch (err) {
+        ui.hideModal();
+        ui.addNotification(
+          null,
+          E("p", {}, err ? err.message : _("Failed to apply changes")),
+          "error",
+        );
+        return;
+      }
+
+      let applied = false;
+      let verified = true;
+      let lastError = null;
+
+      // The procd config trigger restarts Podkop on config.change, i.e. this
+      // normally happens server-side without any JS. Wait for the new config.
+      ui.showModal(_("Restarting service"), [
+        E(
+          "p",
+          { class: "spinning" },
+          _("Restarting Podkop service and applying the configuration..."),
+        ),
+      ]);
+
+      for (let check = 0; check < 20; check += 1) {
+        await sleep(1000);
+        try {
+          const status = await readConfigStatus();
+          if (status && status.stale === false) {
+            applied = true;
+            break;
+          }
+        } catch (err) {
+          // Older backend without get_config_status.
+          verified = false;
+          lastError = err;
+          break;
+        }
+      }
+
+      // Fallback: if the server-side trigger did not run, restart explicitly.
+      if (!applied && verified) {
+        for (let attempt = 0; attempt < 2 && !applied; attempt += 1) {
+          try {
+            await fs.exec("/etc/init.d/podkop", ["restart"]);
+          } catch (err) {
+            lastError = err;
+            console.error("Podkop restart failed", err);
+          }
+
+          for (let check = 0; check < 25; check += 1) {
+            await sleep(1000);
+            try {
+              const status = await readConfigStatus();
+              if (status && status.stale === false) {
+                applied = true;
+                break;
+              }
+            } catch (err) {
+              verified = false;
+              lastError = err;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!verified) {
+        applied = true;
+      }
+
+      ui.hideModal();
+
+      if (applied) {
+        ui.addNotification(
+          null,
+          E(
+            "p",
+            {},
+            _(
+              "Configuration applied: sing-box config was regenerated and the service restarted.",
+            ),
+          ),
+          "info",
+        );
+      } else {
+        console.error("Podkop configuration was not applied", lastError);
+        ui.addNotification(
+          null,
+          E(
+            "p",
+            {},
+            _(
+              "The configuration was saved but Podkop could not apply it automatically. Run service podkop restart on the router and check the logs.",
+            ),
+          ),
+          "error",
+        );
+      }
     });
   },
 };
+
 
 return view.extend(EntryPoint);
