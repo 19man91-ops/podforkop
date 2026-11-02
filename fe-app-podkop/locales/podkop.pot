@@ -1574,3 +1574,10 @@ msgstr ""
 msgid "Used"
 msgstr ""
 
+
+msgid "After changing a section press Save & Apply at the bottom of the page: Podkop will regenerate the config and restart automatically."
+msgstr ""
+
+msgid "Failed to restart Podkop service. The changes are saved; run service podkop restart manually."
+msgstr ""
+

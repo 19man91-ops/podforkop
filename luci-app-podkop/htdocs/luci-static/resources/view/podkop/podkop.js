@@ -214,9 +214,14 @@ const EntryPoint = {
     sectionsSection.sortable = true;
     sectionsSection.addbtntitle = _("Add section");
     sectionsSection.nodescriptions = true;
-    sectionsSection.description = _(
-      "Select a section to edit its connection and traffic rules. Drag rows with mouse to reorder rules precedence.",
-    );
+    sectionsSection.description =
+      _(
+        "Select a section to edit its connection and traffic rules. Drag rows with mouse to reorder rules precedence.",
+      ) +
+      " " +
+      _(
+        "After changing a section press Save & Apply at the bottom of the page: Podkop will regenerate the config and restart automatically.",
+      );
 
     // Render section content
     const deviceChoices = await loadDeviceChoices();
@@ -306,7 +311,21 @@ const EntryPoint = {
           ]);
           return fs
             .exec("/etc/init.d/podkop", ["restart"])
-            .catch(() => {})
+            .catch((err) => {
+              console.error("Podkop restart failed", err);
+              ui.hideModal();
+              ui.addNotification(
+                null,
+                E(
+                  "p",
+                  {},
+                  _(
+                    "Failed to restart Podkop service. The changes are saved; run service podkop restart manually.",
+                  ),
+                ),
+                "error",
+              );
+            })
             .finally(() => {
               ui.hideModal();
             });

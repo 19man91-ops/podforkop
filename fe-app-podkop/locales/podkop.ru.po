@@ -1229,3 +1229,10 @@ msgstr "Тест скорости не удался"
 msgid "Used"
 msgstr "Использовано"
 
+
+msgid "After changing a section press Save & Apply at the bottom of the page: Podkop will regenerate the config and restart automatically."
+msgstr "После изменения секции нажмите Save & Apply внизу страницы — Podkop перегенерирует конфиг и автоматически перезапустится."
+
+msgid "Failed to restart Podkop service. The changes are saved; run service podkop restart manually."
+msgstr "Не удалось перезапустить Podkop. Изменения сохранены; выполните service podkop restart вручную."
+
