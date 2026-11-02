@@ -1,6 +1,0 @@
-{
-  "meta": {
-    "title": "Telegram Bridge",
-    "description": "Mirrors DeepSeek Harness sessions into Telegram chats and lets the agent be used from Telegram."
-  }
-}
