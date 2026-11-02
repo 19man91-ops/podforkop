@@ -3534,6 +3534,25 @@ update_to_latest() {
     fi
 }
 
+get_config_status() {
+    local config_path config_file uci_file uci_mtime config_mtime stale=0
+
+    config_get config_path "settings" "config_path"
+    [ -n "$config_path" ] || config_path="/etc/sing-box/config.json"
+    config_file="$config_path"
+    uci_file="/etc/config/podkop"
+
+    uci_mtime=$(stat -c %Y "$uci_file" 2> /dev/null || echo 0)
+    config_mtime=$(stat -c %Y "$config_file" 2> /dev/null || echo 0)
+    [ "$uci_mtime" -gt "$config_mtime" ] && stale=1
+
+    jq -n --argjson stale "$stale" --argjson uci_mtime "$uci_mtime" --argjson config_mtime "$config_mtime" '{
+        stale: ($stale == 1),
+        uci_mtime: $uci_mtime,
+        config_mtime: $config_mtime
+    }'
+}
+
 show_help() {
     cat << EOF
 Usage: $0 COMMAND
@@ -3570,6 +3589,7 @@ Available commands:
     get_system_info         Get system information in JSON format
     get_sing_box_features   Get the features of the installed sing-box in JSON format
     check_dns_available     Check DNS server availability
+    get_config_status       Show whether UCI changes are applied to sing-box config
     update_to_latest        Download and install the latest release packages
     global_check            Run global system check
 EOF
@@ -3641,6 +3661,9 @@ show_config)
     ;;
 show_version)
     show_version
+    ;;
+get_config_status)
+    get_config_status
     ;;
 update_to_latest)
     update_to_latest

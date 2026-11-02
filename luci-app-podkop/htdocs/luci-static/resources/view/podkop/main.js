@@ -5317,17 +5317,26 @@ async function runSectionsCheck() {
   const items = (await Promise.all(
     sections.data.map(async (section) => {
       if (section.withTagSelect) {
-        const latencyGroup = await PodkopShellMethods.getClashApiGroupLatency(
-          section.code
+        const urlTestGroup = section.outbounds.find(
+          (outbound) => outbound.type === "URLTest"
         );
-        const groupSuccess = latencyGroup.success && !latencyGroup.data.message;
-        return section.outbounds.map((outbound) => {
-          const delay = groupSuccess ? latencyGroup.data?.[outbound.code] : void 0;
-          const success2 = Boolean(delay);
+        const latencyGroup = await PodkopShellMethods.getClashApiGroupLatency(
+          urlTestGroup?.code || section.code
+        );
+        const groupData = latencyGroup.success && !latencyGroup.data.message ? latencyGroup.data : {};
+        const nodeDelays = section.outbounds.map((outbound) => {
+          const liveDelay = groupData[outbound.code] ?? groupData[outbound.displayName];
+          return typeof liveDelay === "number" && liveDelay > 0 ? liveDelay : outbound.latency > 0 ? outbound.latency : 0;
+        });
+        const fallbackDelay = nodeDelays.find((delay) => delay > 0) ?? 0;
+        return section.outbounds.map((outbound, index) => {
+          const isGroupSummary = outbound.type === "URLTest" || outbound.code === urlTestGroup?.code;
+          const delay = nodeDelays[index] || (isGroupSummary ? fallbackDelay : 0);
+          const success2 = delay > 0;
           return {
             state: success2 ? "success" : "error",
             key: `${section.displayName} \xB7 ${outbound.displayName}`,
-            value: success2 ? `${delay} ms` : outbound.latency ? `${outbound.latency} ms` : _("Not responding")
+            value: success2 ? `${delay} ms` : _("Not responding")
           };
         });
       }
@@ -8371,39 +8380,43 @@ var styles5 = `
 }
 
 .fkp_monitoring-page__cell--host {
-    width: 25%;
+    width: 22%;
 }
 
 .fkp_monitoring-page__cell--source {
-    width: 18%;
-}
-
-.fkp_monitoring-page__cell--route {
     width: 15%;
 }
 
+.fkp_monitoring-page__cell--route {
+    width: 12%;
+}
+
 .fkp_monitoring-page__cell--network {
-    width: 8%;
+    width: 7%;
 }
 
 .fkp_monitoring-page__cell--time {
-    width: 10%;
+    width: 8%;
     text-align: right;
 }
 
 .fkp_monitoring-page__cell--download {
-    width: 10%;
+    width: 8%;
     text-align: right;
 }
 
 .fkp_monitoring-page__cell--upload {
-    width: 10%;
+    width: 8%;
     text-align: right;
 }
 
 .fkp_monitoring-page__cell--action {
-    width: 4%;
+    width: 76px;
+    min-width: 76px;
+    overflow: visible;
     text-align: center;
+    padding-left: 4px;
+    padding-right: 4px;
 }
 
 .fkp_monitoring-page__sort {

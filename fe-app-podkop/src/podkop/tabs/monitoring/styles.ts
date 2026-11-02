@@ -186,39 +186,43 @@ export const styles = `
 }
 
 .fkp_monitoring-page__cell--host {
-    width: 25%;
+    width: 22%;
 }
 
 .fkp_monitoring-page__cell--source {
-    width: 18%;
-}
-
-.fkp_monitoring-page__cell--route {
     width: 15%;
 }
 
+.fkp_monitoring-page__cell--route {
+    width: 12%;
+}
+
 .fkp_monitoring-page__cell--network {
-    width: 8%;
+    width: 7%;
 }
 
 .fkp_monitoring-page__cell--time {
-    width: 10%;
+    width: 8%;
     text-align: right;
 }
 
 .fkp_monitoring-page__cell--download {
-    width: 10%;
+    width: 8%;
     text-align: right;
 }
 
 .fkp_monitoring-page__cell--upload {
-    width: 10%;
+    width: 8%;
     text-align: right;
 }
 
 .fkp_monitoring-page__cell--action {
-    width: 4%;
+    width: 76px;
+    min-width: 76px;
+    overflow: visible;
     text-align: center;
+    padding-left: 4px;
+    padding-right: 4px;
 }
 
 .fkp_monitoring-page__sort {

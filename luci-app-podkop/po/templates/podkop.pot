@@ -1622,3 +1622,10 @@ msgstr ""
 msgid "Your settings and sections are kept. The service will be restarted after the update."
 msgstr ""
 
+
+msgid "Click Save & Apply to regenerate the sing-box configuration and restart Podkop."
+msgstr ""
+
+msgid "Settings are saved but not applied. "
+msgstr ""
+

@@ -1279,3 +1279,10 @@ msgstr "Обновление PodForCOP"
 msgid "Your settings and sections are kept. The service will be restarted after the update."
 msgstr "Ваши настройки и секции сохранятся. После обновления служба будет перезапущена."
 
+
+msgid "Click Save & Apply to regenerate the sing-box configuration and restart Podkop."
+msgstr "Нажмите Save & Apply, чтобы перегенерировать конфигурацию sing-box и перезапустить Podkop."
+
+msgid "Settings are saved but not applied. "
+msgstr "Настройки сохранены, но не применены. "
+

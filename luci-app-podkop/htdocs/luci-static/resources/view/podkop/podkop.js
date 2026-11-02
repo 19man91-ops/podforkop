@@ -200,13 +200,23 @@ const PODKOP_UI_CSS = `
 }
 
 #cbi-podkop > h2 {
-    margin: 0 0 2px;
+    margin: 0;
+    padding: 14px 16px 2px;
+    border: 1px solid var(--pdk-ui-border);
+    border-bottom: 0;
+    border-radius: 12px 12px 0 0;
+    background: linear-gradient(135deg, var(--pdk-ui-panel), transparent);
     font-size: 1.55rem;
     letter-spacing: -0.01em;
 }
 
 #cbi-podkop > .cbi-map-descr {
     margin: 0 0 14px;
+    padding: 0 16px 12px;
+    border: 1px solid var(--pdk-ui-border);
+    border-top: 0;
+    border-radius: 0 0 12px 12px;
+    background: linear-gradient(135deg, var(--pdk-ui-panel), transparent);
     color: var(--text-color-medium, #777);
 }
 
@@ -269,7 +279,41 @@ const PODKOP_UI_CSS = `
     font-size: 1.02rem;
 }
 
-#cbi-podkop .cbi-section-table {
+#cbi-podkop .cbi-tabmenu > li > a::before {
+    display: inline-block;
+    margin-right: 7px;
+    opacity: 0.75;
+    font-weight: 400;
+}
+
+#cbi-podkop .cbi-tabmenu > li:nth-child(1) > a::before { content: "▦"; }
+#cbi-podkop .cbi-tabmenu > li:nth-child(2) > a::before { content: "⚙"; }
+#cbi-podkop .cbi-tabmenu > li:nth-child(3) > a::before { content: "◉"; }
+#cbi-podkop .cbi-tabmenu > li:nth-child(4) > a::before { content: "▤"; }
+#cbi-podkop .cbi-tabmenu > li:nth-child(5) > a::before { content: "≋"; }
+
+#cbi-podkop .cbi-page-actions .cbi-button-save {
+    display: none !important;
+}
+
+.pdk-app-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.pdk-config-stale {
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--warn-color-medium, #d9a300);
+    border-left: 4px solid var(--warn-color-medium, #d9a300);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--warn-color-medium, #d9a300) 14%, transparent);
+    color: inherit;
+}#cbi-podkop .cbi-section-table {
+    border-radius: 10px;
+    overflow: hidden;
+}
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
@@ -461,7 +505,33 @@ const EntryPoint = {
 
     const rendered = await podkopMap.render();
     enableRowDragAndDrop(rendered);
-    return rendered;
+
+    let staleBanner = null;
+    try {
+      const configStatusResult = await fs.exec("/usr/bin/podkop", [
+        "get_config_status",
+      ]);
+      const configStatus = JSON.parse(configStatusResult?.stdout || "{}");
+      if (configStatus?.stale) {
+        staleBanner = E("div", { class: "pdk-config-stale" }, [
+          E("b", {}, _("Settings are saved but not applied. ")),
+          E(
+            "span",
+            {},
+            _(
+              "Click Save & Apply to regenerate the sing-box configuration and restart Podkop.",
+            ),
+          ),
+        ]);
+      }
+    } catch (e) {
+      console.error("Podkop config status check failed", e);
+    }
+
+    return E("div", { class: "pdk-app-shell" }, [
+      ...(staleBanner ? [staleBanner] : []),
+      rendered,
+    ]);
   },
 
   handleSaveApply(ev, mode) {

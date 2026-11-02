@@ -36,26 +36,43 @@ export async function runSectionsCheck() {
     await Promise.all(
       sections.data.map(async (section) => {
         if (section.withTagSelect) {
-          const latencyGroup = await PodkopShellMethods.getClashApiGroupLatency(
-            section.code,
+          // For URLTest sections the selector only reports the URLTest group
+          // itself, while the URLTest group reports every node. Use the group
+          // tag for latency so each node gets its real delay.
+          const urlTestGroup = section.outbounds.find(
+            (outbound) => outbound.type === 'URLTest',
           );
-          const groupSuccess =
-            latencyGroup.success && !latencyGroup.data.message;
+          const latencyGroup = await PodkopShellMethods.getClashApiGroupLatency(
+            urlTestGroup?.code || section.code,
+          );
+          const groupData =
+            latencyGroup.success && !latencyGroup.data.message
+              ? latencyGroup.data
+              : ({} as Record<string, number>);
 
-          return section.outbounds.map((outbound) => {
-            const delay = groupSuccess
-              ? latencyGroup.data?.[outbound.code]
-              : undefined;
-            const success = Boolean(delay);
+          const nodeDelays = section.outbounds.map((outbound) => {
+            const liveDelay =
+              groupData[outbound.code] ?? groupData[outbound.displayName];
+            return typeof liveDelay === 'number' && liveDelay > 0
+              ? liveDelay
+              : outbound.latency > 0
+                ? outbound.latency
+                : 0;
+          });
+          const fallbackDelay = nodeDelays.find((delay) => delay > 0) ?? 0;
+
+          return section.outbounds.map((outbound, index) => {
+            const isGroupSummary =
+              outbound.type === 'URLTest' ||
+              outbound.code === urlTestGroup?.code;
+            const delay =
+              nodeDelays[index] || (isGroupSummary ? fallbackDelay : 0);
+            const success = delay > 0;
 
             return {
               state: success ? 'success' : 'error',
               key: `${section.displayName} · ${outbound.displayName}`,
-              value: success
-                ? `${delay} ms`
-                : outbound.latency
-                  ? `${outbound.latency} ms`
-                  : _('Not responding'),
+              value: success ? `${delay} ms` : _('Not responding'),
             } as IDiagnosticsChecksItem;
           });
         }
