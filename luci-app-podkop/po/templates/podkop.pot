@@ -1691,3 +1691,12 @@ msgstr ""
 msgid "Yandex"
 msgstr ""
 
+msgid "Yandex Mirror"
+msgstr ""
+
+msgid "VK"
+msgstr ""
+
+msgid "Mail.ru"
+msgstr ""
+

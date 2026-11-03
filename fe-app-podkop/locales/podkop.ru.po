@@ -1348,3 +1348,12 @@ msgstr "GitHub"
 msgid "Yandex"
 msgstr "Яндекс"
 
+msgid "Yandex Mirror"
+msgstr "Yandex Mirror"
+
+msgid "VK"
+msgstr "VK"
+
+msgid "Mail.ru"
+msgstr "Mail.ru"
+

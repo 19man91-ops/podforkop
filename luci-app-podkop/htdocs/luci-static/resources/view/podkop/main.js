@@ -1281,13 +1281,17 @@ var URLTEST_TESTING_URL_OPTIONS = {
   "https://www.instagram.com": "https://www.instagram.com (Instagram)",
   "https://www.youtube.com": "https://www.youtube.com (YouTube)",
   "https://github.com": "https://github.com (GitHub)",
-  "https://ya.ru": "https://ya.ru (Yandex)"
+  "https://ya.ru": "https://ya.ru (Yandex)",
+  "https://mirror.yandex.ru/debian/dists/bookworm/Release": "https://mirror.yandex.ru/debian/dists/bookworm/Release (Yandex Mirror)",
+  "https://vk.com/robots.txt": "https://vk.com/robots.txt (VK)",
+  "https://mail.ru/robots.txt": "https://mail.ru/robots.txt (Mail.ru)"
 };
 var SPEEDTEST_PROVIDER_OPTIONS = {
   cloudflare: "Cloudflare",
   hetzner: "Hetzner",
   cachefly: "CacheFly",
   ovh: "OVH",
+  yandex: "Yandex Mirror",
   custom: "Custom URL"
 };
 var URLTEST_DOWNLOAD_URL_OPTIONS = {

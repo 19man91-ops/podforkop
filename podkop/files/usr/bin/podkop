@@ -2844,7 +2844,7 @@ clash_api() {
         ;;
 
     speed_test)
-        local tag="$2" config_path url start_time end_time elapsed bytes mbps
+        local tag="$2" config_path url start_time end_time elapsed bytes mbps tmpfile
         local speedtest_provider speedtest_custom_url
         [ -n "$tag" ] || {
             echo '{"success":false,"error":"missing_tag"}' | jq .
@@ -2858,6 +2858,7 @@ clash_api() {
             hetzner) url="https://speed.hetzner.de/2MB.bin" ;;
             cachefly) url="https://cachefly.cachefly.net/2mb.test" ;;
             ovh) url="https://proof.ovh.net/files/2Mb.dat" ;;
+            yandex) url="https://mirror.yandex.ru/debian/dists/bookworm/main/binary-amd64/Packages.xz" ;;
             custom)
                 config_get speedtest_custom_url "settings" "speedtest_url"
                 if [ -n "$speedtest_custom_url" ]; then
@@ -2871,15 +2872,19 @@ clash_api() {
         if [ -n "${3:-}" ]; then
             url="$3"
         fi
-        bytes=2097152
+        tmpfile=$(mktemp)
         start_time=$(date +%s)
-        if podkop_tools_fetch_with_outbound "$config_path" "$tag" "$url" 15 >/dev/null 2>&1; then
+        if podkop_tools_fetch_with_outbound "$config_path" "$tag" "$url" 15 >"$tmpfile" 2>/dev/null; then
             end_time=$(date +%s)
+            bytes=$(wc -c <"$tmpfile" 2>/dev/null | tr -d ' ')
+            [ -n "$bytes" ] && [ "$bytes" -gt 0 ] || bytes=2097152
             elapsed=$((end_time - start_time))
             [ "$elapsed" -lt 1 ] && elapsed=1
             mbps=$((bytes * 8 / elapsed / 1000000))
+            rm -f "$tmpfile"
             echo "{\"success\":true,\"tag\":\"$tag\",\"mbps\":$mbps,\"seconds\":$elapsed,\"bytes\":$bytes}" | jq .
         else
+            rm -f "$tmpfile"
             echo "{\"success\":false,\"tag\":\"$tag\",\"error\":\"download_failed\"}" | jq .
             return 1
         fi
