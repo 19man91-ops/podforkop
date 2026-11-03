@@ -1306,3 +1306,45 @@ msgstr "Конфигурация сохранена, но Podkop не смог �
 msgid "Private MAC"
 msgstr "Приватный MAC"
 
+msgid "Latency Test Provider"
+msgstr "Провайдер проверки задержки"
+
+msgid "Provider used to measure server latency"
+msgstr "Провайдер, через который измеряется задержка серверов"
+
+msgid "Speed Test Provider"
+msgstr "Провайдер замера скорости"
+
+msgid "Provider used for the download speed test on the dashboard"
+msgstr "Провайдер, через который выполняется замер скорости на дашборде"
+
+msgid "Speed Test URL"
+msgstr "URL для замера скорости"
+
+msgid "URL must return about 2 MB of data"
+msgstr "URL должен отдавать около 2 МБ данных"
+
+msgid "Cloudflare"
+msgstr "Cloudflare"
+
+msgid "Hetzner"
+msgstr "Hetzner"
+
+msgid "CacheFly"
+msgstr "CacheFly"
+
+msgid "OVH"
+msgstr "OVH"
+
+msgid "Instagram"
+msgstr "Instagram"
+
+msgid "YouTube"
+msgstr "YouTube"
+
+msgid "GitHub"
+msgstr "GitHub"
+
+msgid "Yandex"
+msgstr "Яндекс"
+

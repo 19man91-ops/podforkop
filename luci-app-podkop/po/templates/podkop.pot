@@ -1649,3 +1649,45 @@ msgstr ""
 msgid "Private MAC"
 msgstr ""
 
+msgid "Latency Test Provider"
+msgstr ""
+
+msgid "Provider used to measure server latency"
+msgstr ""
+
+msgid "Speed Test Provider"
+msgstr ""
+
+msgid "Provider used for the download speed test on the dashboard"
+msgstr ""
+
+msgid "Speed Test URL"
+msgstr ""
+
+msgid "URL must return about 2 MB of data"
+msgstr ""
+
+msgid "Cloudflare"
+msgstr ""
+
+msgid "Hetzner"
+msgstr ""
+
+msgid "CacheFly"
+msgstr ""
+
+msgid "OVH"
+msgstr ""
+
+msgid "Instagram"
+msgstr ""
+
+msgid "YouTube"
+msgstr ""
+
+msgid "GitHub"
+msgstr ""
+
+msgid "Yandex"
+msgstr ""
+

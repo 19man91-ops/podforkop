@@ -360,41 +360,17 @@ function createSectionContent(section, singBoxFeatures = [], deviceChoices = [])
   };
 
   o = section.option(
-    form.Value,
+    form.ListValue,
     "urltest_testing_url",
-    _("URLTest Testing URL"),
-    _("The URL used to test server connectivity"),
+    _("Latency Test Provider"),
+    _("Provider used to measure server latency"),
   );
-  o.value(
-    "https://www.gstatic.com/generate_204",
-    "https://www.gstatic.com/generate_204 (Google)",
-  );
-  o.value(
-    "https://cp.cloudflare.com/generate_204",
-    "https://cp.cloudflare.com/generate_204 (Cloudflare)",
-  );
-  o.value("https://captive.apple.com", "https://captive.apple.com (Apple)");
-  o.value(
-    "https://connectivity-check.ubuntu.com",
-    "https://connectivity-check.ubuntu.com (Ubuntu)",
-  );
+  Object.entries(main.URLTEST_TESTING_URL_OPTIONS).forEach(([key, label]) => {
+    o.value(key, _(label));
+  });
   o.default = "https://www.gstatic.com/generate_204";
   o.rmempty = false;
   o.depends("proxy_config_type", "urltest");
-
-  o.validate = function (section_id, value) {
-    if (!value || value.length === 0) {
-      return true;
-    }
-
-    const validation = main.validateUrl(value);
-
-    if (validation.valid) {
-      return true;
-    }
-
-    return validation.message;
-  };
 
   if (singBoxFeatures.includes("urltest.download_url")) {
     o = section.option(

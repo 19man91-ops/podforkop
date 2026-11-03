@@ -77,6 +77,25 @@ export const DNS_SERVER_OPTIONS = {
     'unfiltered.adguard-dns.com (AdGuard Unfiltered)',
   'family.adguard-dns.com': 'family.adguard-dns.com (AdGuard Family)',
 };
+export const URLTEST_TESTING_URL_OPTIONS = {
+  'https://www.gstatic.com/generate_204': 'https://www.gstatic.com/generate_204 (Google)',
+  'https://cp.cloudflare.com/generate_204':
+    'https://cp.cloudflare.com/generate_204 (Cloudflare)',
+  'https://captive.apple.com': 'https://captive.apple.com (Apple)',
+  'https://connectivity-check.ubuntu.com':
+    'https://connectivity-check.ubuntu.com (Ubuntu)',
+  'https://www.instagram.com': 'https://www.instagram.com (Instagram)',
+  'https://www.youtube.com': 'https://www.youtube.com (YouTube)',
+  'https://github.com': 'https://github.com (GitHub)',
+  'https://ya.ru': 'https://ya.ru (Yandex)',
+};
+export const SPEEDTEST_PROVIDER_OPTIONS = {
+  cloudflare: 'Cloudflare',
+  hetzner: 'Hetzner',
+  cachefly: 'CacheFly',
+  ovh: 'OVH',
+  custom: 'Custom URL',
+};
 export const URLTEST_DOWNLOAD_URL_OPTIONS = {
   'https://speed.cloudflare.com/__down?bytes=65536':
     'https://speed.cloudflare.com/__down?bytes=65536 (Cloudflare)',

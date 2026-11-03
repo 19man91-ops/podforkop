@@ -10,6 +10,38 @@
 function createSettingsContent(section, singBoxFeatures = []) {
   let o = section.option(
     form.ListValue,
+    "speedtest_provider",
+    _("Speed Test Provider"),
+    _("Provider used for the download speed test on the dashboard"),
+  );
+  Object.entries(main.SPEEDTEST_PROVIDER_OPTIONS).forEach(([key, label]) => {
+    o.value(key, _(label));
+  });
+  o.default = "cloudflare";
+  o.rmempty = false;
+
+  o = section.option(
+    form.Value,
+    "speedtest_url",
+    _("Speed Test URL"),
+    _("URL must return about 2 MB of data"),
+  );
+  o.default = "https://speed.cloudflare.com/__down?bytes=2097152";
+  o.rmempty = false;
+  o.depends("speedtest_provider", "custom");
+  o.validate = function (section_id, value) {
+    if (!value || value.length === 0) {
+      return true;
+    }
+    const validation = main.validateUrl(value);
+    if (validation.valid) {
+      return true;
+    }
+    return validation.message;
+  };
+
+  o = section.option(
+    form.ListValue,
     "dns_type",
     _("DNS Protocol Type"),
     _("Select DNS protocol to use"),

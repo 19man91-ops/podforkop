@@ -2845,13 +2845,30 @@ clash_api() {
 
     speed_test)
         local tag="$2" config_path url start_time end_time elapsed bytes mbps
+        local speedtest_provider speedtest_custom_url
         [ -n "$tag" ] || {
             echo '{"success":false,"error":"missing_tag"}' | jq .
             return 1
         }
         config_get config_path "settings" "config_path"
         [ -n "$config_path" ] || config_path="/etc/sing-box/config.json"
-        url="${3:-https://speed.cloudflare.com/__down?bytes=2097152}"
+        config_get speedtest_provider "settings" "speedtest_provider" "cloudflare"
+        case "$speedtest_provider" in
+            cloudflare) url="https://speed.cloudflare.com/__down?bytes=2097152" ;;
+            hetzner) url="https://speed.hetzner.de/2MB.bin" ;;
+            cachefly) url="https://cachefly.cachefly.net/2mb.test" ;;
+            ovh) url="https://proof.ovh.net/files/2Mb.dat" ;;
+            custom)
+                config_get speedtest_custom_url "settings" "speedtest_url"
+                if [ -n "$speedtest_custom_url" ]; then
+                    url="$speedtest_custom_url"
+                else
+                    url="https://speed.cloudflare.com/__down?bytes=2097152"
+                fi
+                ;;
+            *) url="https://speed.cloudflare.com/__down?bytes=2097152" ;;
+        esac
+        [ -n "$3" ] && url="$3"
         bytes=2097152
         start_time=$(date +%s)
         if podkop_tools_fetch_with_outbound "$config_path" "$tag" "$url" 15 >/dev/null 2>&1; then
