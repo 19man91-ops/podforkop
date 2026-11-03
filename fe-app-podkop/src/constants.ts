@@ -78,7 +78,8 @@ export const DNS_SERVER_OPTIONS = {
   'family.adguard-dns.com': 'family.adguard-dns.com (AdGuard Family)',
 };
 export const URLTEST_TESTING_URL_OPTIONS = {
-  'https://www.gstatic.com/generate_204': 'https://www.gstatic.com/generate_204 (Google)',
+  'https://www.gstatic.com/generate_204':
+    'https://www.gstatic.com/generate_204 (Google)',
   'https://cp.cloudflare.com/generate_204':
     'https://cp.cloudflare.com/generate_204 (Cloudflare)',
   'https://captive.apple.com': 'https://captive.apple.com (Apple)',

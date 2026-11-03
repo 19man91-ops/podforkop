@@ -2868,7 +2868,9 @@ clash_api() {
                 ;;
             *) url="https://speed.cloudflare.com/__down?bytes=2097152" ;;
         esac
-        [ -n "$3" ] && url="$3"
+        if [ -n "${3:-}" ]; then
+            url="$3"
+        fi
         bytes=2097152
         start_time=$(date +%s)
         if podkop_tools_fetch_with_outbound "$config_path" "$tag" "$url" 15 >/dev/null 2>&1; then
