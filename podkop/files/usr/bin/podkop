@@ -2385,6 +2385,14 @@ _mask_dns_server() {
     fi
 }
 
+_podkop_dig() {
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 5 dig "$@"
+    else
+        dig "$@"
+    fi
+}
+
 _test_dns_server() {
     local dns_type="$1"
     local server="$2"
@@ -2400,13 +2408,13 @@ _test_dns_server() {
         else
             host="$server"
         fi
-        dig @"$host" "$domain" +https="$doh_path" +timeout=2 +tries=1 > /dev/null 2>&1
+        _podkop_dig @"$host" "$domain" +https="$doh_path" +timeout=2 +tries=1 > /dev/null 2>&1
         ;;
     dot)
-        dig @"$server" "$domain" +tls +timeout=2 +tries=1 > /dev/null 2>&1
+        _podkop_dig @"$server" "$domain" +tls +timeout=2 +tries=1 > /dev/null 2>&1
         ;;
     *)
-        dig @"$server" "$domain" +timeout=2 +tries=1 > /dev/null 2>&1
+        _podkop_dig @"$server" "$domain" +timeout=2 +tries=1 > /dev/null 2>&1
         ;;
     esac
 }
@@ -2454,7 +2462,7 @@ check_dns_available() {
     ok=1
     for server in $PODKOP_DNS_BOOTSTRAP_LIST; do
         display="$(_mask_dns_server "$server")"
-        if dig @"$server" "google.com" +timeout=2 +tries=1 > /dev/null 2>&1; then
+        if _podkop_dig @"$server" "google.com" +timeout=2 +tries=1 > /dev/null 2>&1; then
             status=1
             any=1
         else
@@ -2471,7 +2479,7 @@ check_dns_available() {
     local dhcp_config_status=1
 
     # Check if local DNS resolver is working
-    if dig @127.0.0.1 "google.com" +timeout=2 +tries=1 > /dev/null 2>&1; then
+    if _podkop_dig @127.0.0.1 "google.com" +timeout=2 +tries=1 > /dev/null 2>&1; then
         dns_on_router=1
     fi
 

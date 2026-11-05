@@ -6066,19 +6066,44 @@ async function onStoreUpdate2(next, prev, diff) {
     renderDiagnosticSystemInfoWidget();
   }
 }
+var DIAGNOSTIC_CHECK_TIMEOUT_MS = 2e4;
+function markCheckFailed(code) {
+  store.set({
+    diagnosticsChecks: store.get().diagnosticsChecks.map(
+      (check) => check.code === code ? {
+        ...check,
+        state: "error",
+        description: _("Cannot receive checks result"),
+        items: []
+      } : check
+    )
+  });
+}
 async function runChecks() {
+  const checks = [
+    { code: "DNS" /* DNS */, run: runDnsCheck },
+    { code: "SINGBOX" /* SINGBOX */, run: runSingBoxCheck },
+    { code: "NFT" /* NFT */, run: runNftCheck },
+    { code: "OUTBOUNDS" /* OUTBOUNDS */, run: runSectionsCheck },
+    { code: "FAKEIP" /* FAKEIP */, run: runFakeIPCheck }
+  ];
   try {
     store.set({
       diagnosticsRunAction: { loading: true },
       diagnosticsChecks: loadingDiagnosticsChecksStore.diagnosticsChecks
     });
-    await runDnsCheck();
-    await runSingBoxCheck();
-    await runNftCheck();
-    await runSectionsCheck();
-    await runFakeIPCheck();
-  } catch (e) {
-    logger.error("[DIAGNOSTIC]", "runChecks - e", e);
+    for (const check of checks) {
+      try {
+        await withTimeout(
+          check.run(),
+          DIAGNOSTIC_CHECK_TIMEOUT_MS,
+          `diagnostic ${check.code}`
+        );
+      } catch (e) {
+        logger.error("[DIAGNOSTIC]", `${check.code} check failed`, e);
+        markCheckFailed(check.code);
+      }
+    }
   } finally {
     store.set({ diagnosticsRunAction: { loading: false } });
   }

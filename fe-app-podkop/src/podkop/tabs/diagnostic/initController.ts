@@ -1,4 +1,4 @@
-import { onMount, preserveScrollForPage } from '../../../helpers';
+import { onMount, preserveScrollForPage, withTimeout } from '../../../helpers';
 import { runDnsCheck } from './checks/runDnsCheck';
 import { runSingBoxCheck } from './checks/runSingBoxCheck';
 import { runNftCheck } from './checks/runNftCheck';
@@ -19,6 +19,7 @@ import { PODKOP_LUCI_APP_VERSION } from '../../../constants';
 import { showToast } from '../../../helpers/showToast';
 import { runSectionsCheck } from './checks/runSectionsCheck';
 import { getPodkopVersionRow } from './helpers/getPodkopVersionRow';
+import { DIAGNOSTICS_CHECKS } from './checks/contstants';
 
 async function fetchSystemInfo() {
   const systemInfo = await PodkopShellMethods.getSystemInfo();
@@ -757,24 +758,50 @@ async function onStoreUpdate(
   }
 }
 
+const DIAGNOSTIC_CHECK_TIMEOUT_MS = 20000;
+
+function markCheckFailed(code: string) {
+  store.set({
+    diagnosticsChecks: store.get().diagnosticsChecks.map((check) =>
+      check.code === code
+        ? {
+            ...check,
+            state: 'error',
+            description: _('Cannot receive checks result'),
+            items: [],
+          }
+        : check,
+    ),
+  });
+}
+
 async function runChecks() {
+  const checks: Array<{ code: string; run: () => Promise<void> }> = [
+    { code: DIAGNOSTICS_CHECKS.DNS, run: runDnsCheck },
+    { code: DIAGNOSTICS_CHECKS.SINGBOX, run: runSingBoxCheck },
+    { code: DIAGNOSTICS_CHECKS.NFT, run: runNftCheck },
+    { code: DIAGNOSTICS_CHECKS.OUTBOUNDS, run: runSectionsCheck },
+    { code: DIAGNOSTICS_CHECKS.FAKEIP, run: runFakeIPCheck },
+  ];
+
   try {
     store.set({
       diagnosticsRunAction: { loading: true },
       diagnosticsChecks: loadingDiagnosticsChecksStore.diagnosticsChecks,
     });
 
-    await runDnsCheck();
-
-    await runSingBoxCheck();
-
-    await runNftCheck();
-
-    await runSectionsCheck();
-
-    await runFakeIPCheck();
-  } catch (e) {
-    logger.error('[DIAGNOSTIC]', 'runChecks - e', e);
+    for (const check of checks) {
+      try {
+        await withTimeout(
+          check.run(),
+          DIAGNOSTIC_CHECK_TIMEOUT_MS,
+          `diagnostic ${check.code}`,
+        );
+      } catch (e) {
+        logger.error('[DIAGNOSTIC]', `${check.code} check failed`, e);
+        markCheckFailed(check.code);
+      }
+    }
   } finally {
     store.set({ diagnosticsRunAction: { loading: false } });
   }
