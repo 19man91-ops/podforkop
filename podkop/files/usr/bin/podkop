@@ -3449,15 +3449,34 @@ _podkop_update_fetch() {
     local url="$1"
     local out="$2"
 
+    # GitHub release assets redirect to release-assets.githubusercontent.com.
+    # Some OpenWrt builds have broken IPv6 or a curl that cannot follow that
+    # redirect, so try every available client instead of giving up after the
+    # first one. IPv4 avoids hanging on broken IPv6 paths.
+    rm -f "$out"
+
     if command -v curl > /dev/null 2>&1; then
-        curl -fsSL --connect-timeout 20 -o "$out" "$url" 2> /dev/null
-    elif command -v wget > /dev/null 2>&1; then
-        wget -q -O "$out" "$url" 2> /dev/null
-    elif command -v uclient-fetch > /dev/null 2>&1; then
-        uclient-fetch -q -O "$out" "$url" 2> /dev/null
-    else
-        return 1
+        if curl -4 -fsSL --retry 2 --retry-delay 2 --connect-timeout 20 --max-time 300 -o "$out" "$url" 2> /dev/null; then
+            [ -s "$out" ] && return 0
+        fi
+        rm -f "$out"
     fi
+
+    if command -v wget > /dev/null 2>&1; then
+        if wget -q -T 30 -O "$out" "$url" 2> /dev/null; then
+            [ -s "$out" ] && return 0
+        fi
+        rm -f "$out"
+    fi
+
+    if command -v uclient-fetch > /dev/null 2>&1; then
+        if uclient-fetch -q -T 30 -O "$out" "$url" 2> /dev/null; then
+            [ -s "$out" ] && return 0
+        fi
+        rm -f "$out"
+    fi
+
+    return 1
 }
 
 _podkop_update_latest_tag() {
