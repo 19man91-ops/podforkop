@@ -5,6 +5,9 @@ export const PodkopShellMethods = {
   checkDNSAvailable: async () =>
     callBaseMethod<Podkop.DnsCheckResult>(
       Podkop.AvailableMethods.CHECK_DNS_AVAILABLE,
+      [],
+      '/usr/bin/podkop',
+      35000,
     ),
   checkFakeIP: async () =>
     callBaseMethod<Podkop.FakeIPCheckResult>(

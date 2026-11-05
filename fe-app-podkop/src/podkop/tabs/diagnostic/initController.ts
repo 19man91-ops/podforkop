@@ -758,7 +758,13 @@ async function onStoreUpdate(
   }
 }
 
-const DIAGNOSTIC_CHECK_TIMEOUT_MS = 20000;
+const DIAGNOSTIC_CHECK_TIMEOUT_MS: Record<string, number> = {
+  DNS: 40000,
+  SINGBOX: 20000,
+  NFT: 20000,
+  OUTBOUNDS: 30000,
+  FAKEIP: 25000,
+};
 
 function markCheckFailed(code: string) {
   store.set({
@@ -794,7 +800,7 @@ async function runChecks() {
       try {
         await withTimeout(
           check.run(),
-          DIAGNOSTIC_CHECK_TIMEOUT_MS,
+          DIAGNOSTIC_CHECK_TIMEOUT_MS[check.code] ?? 20000,
           `diagnostic ${check.code}`,
         );
       } catch (e) {

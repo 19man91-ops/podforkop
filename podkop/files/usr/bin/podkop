@@ -2387,7 +2387,7 @@ _mask_dns_server() {
 
 _podkop_dig() {
     if command -v timeout >/dev/null 2>&1; then
-        timeout 5 dig "$@"
+        timeout 3 dig "$@"
     else
         dig "$@"
     fi
@@ -2424,6 +2424,11 @@ check_dns_available() {
     local dns_servers_json='[]' bootstrap_servers_json='[]'
     local first_dns="" first_bootstrap="" ok any server display status
     local dns_status=0 bootstrap_dns_status=0
+    local deadline
+
+    # Keep the whole check bounded even with many configured servers. The UI
+    # waits up to 40s; stopping at 25s guarantees a JSON result before that.
+    deadline=$(( $(date +%s) + 25 ))
 
     config_get dns_type "settings" "dns_type"
 
@@ -2445,7 +2450,10 @@ check_dns_available() {
     ok=1
     for server in $PODKOP_DNS_MAIN_LIST; do
         display="$(_mask_dns_server "$server")"
-        if _test_dns_server "$dns_type" "$server"; then
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+            status=0
+            ok=0
+        elif _test_dns_server "$dns_type" "$server"; then
             status=1
             any=1
         else
@@ -2462,7 +2470,10 @@ check_dns_available() {
     ok=1
     for server in $PODKOP_DNS_BOOTSTRAP_LIST; do
         display="$(_mask_dns_server "$server")"
-        if _podkop_dig @"$server" "google.com" +timeout=2 +tries=1 > /dev/null 2>&1; then
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+            status=0
+            ok=0
+        elif _podkop_dig @"$server" "google.com" +timeout=2 +tries=1 > /dev/null 2>&1; then
             status=1
             any=1
         else
@@ -2479,7 +2490,7 @@ check_dns_available() {
     local dhcp_config_status=1
 
     # Check if local DNS resolver is working
-    if _podkop_dig @127.0.0.1 "google.com" +timeout=2 +tries=1 > /dev/null 2>&1; then
+    if [ "$(date +%s)" -lt "$deadline" ] && _podkop_dig @127.0.0.1 "google.com" +timeout=2 +tries=1 > /dev/null 2>&1; then
         dns_on_router=1
     fi
 

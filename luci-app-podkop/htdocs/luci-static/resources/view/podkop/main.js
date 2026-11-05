@@ -718,7 +718,10 @@ var Podkop;
 // src/podkop/methods/shell/index.ts
 var PodkopShellMethods = {
   checkDNSAvailable: async () => callBaseMethod(
-    Podkop.AvailableMethods.CHECK_DNS_AVAILABLE
+    Podkop.AvailableMethods.CHECK_DNS_AVAILABLE,
+    [],
+    "/usr/bin/podkop",
+    35e3
   ),
   checkFakeIP: async () => callBaseMethod(
     Podkop.AvailableMethods.CHECK_FAKEIP
@@ -6066,7 +6069,13 @@ async function onStoreUpdate2(next, prev, diff) {
     renderDiagnosticSystemInfoWidget();
   }
 }
-var DIAGNOSTIC_CHECK_TIMEOUT_MS = 2e4;
+var DIAGNOSTIC_CHECK_TIMEOUT_MS = {
+  DNS: 4e4,
+  SINGBOX: 2e4,
+  NFT: 2e4,
+  OUTBOUNDS: 3e4,
+  FAKEIP: 25e3
+};
 function markCheckFailed(code) {
   store.set({
     diagnosticsChecks: store.get().diagnosticsChecks.map(
@@ -6096,7 +6105,7 @@ async function runChecks() {
       try {
         await withTimeout(
           check.run(),
-          DIAGNOSTIC_CHECK_TIMEOUT_MS,
+          DIAGNOSTIC_CHECK_TIMEOUT_MS[check.code] ?? 2e4,
           `diagnostic ${check.code}`
         );
       } catch (e) {

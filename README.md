@@ -9,7 +9,7 @@
 ## 📝 Что нового
 
 Полная история изменений по версиям — в **[CHANGELOG.md](CHANGELOG.md)**.
-Самые свежие релизы: [0.9.22](https://github.com/19man91-ops/podforkop/releases/tag/0.9.22),
+Самые свежие релизы: [0.9.23](https://github.com/19man91-ops/podforkop/releases/tag/0.9.23),
 [все релизы](https://github.com/19man91-ops/podforkop/releases).
 
 ---
